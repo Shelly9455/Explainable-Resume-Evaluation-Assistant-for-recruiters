@@ -1,100 +1,157 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { evaluateResume, type EvaluationResult, type GuardrailEval } from "@/lib/evaluate.functions";
+import {
+  analyzeJD,
+  evaluateResume,
+  type EvaluationResult,
+  type GuardrailEval,
+  type JDAnalysis,
+  type LockedCriteria,
+  type SuggestedGuardrail,
+  type WeightageBucket,
+} from "@/lib/evaluate.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   FileText, Sparkles, Loader2, CheckCircle2, AlertTriangle, XCircle,
-  Shield, Target, Scale, AlertOctagon, Search, Brain, MessageSquareQuote, Calculator,
+  Shield, Target, Scale, AlertOctagon, Brain, MessageSquareQuote, Calculator,
+  ArrowRight, ArrowLeft, Upload, Lock, Plus, Trash2, RotateCcw, Wand2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Lucid Hire — Explainable Resume Evaluation" },
-      { name: "description", content: "Evidence-based AI resume evaluation against your job description. Transparent scoring, guardrails, and recruiter interview intelligence." },
-      { property: "og:title", content: "Lucid Hire — Explainable Resume Evaluation" },
-      { property: "og:description", content: "Evidence-based AI resume evaluation against your job description." },
+      { name: "description", content: "Recruiter-configured, evidence-based AI resume evaluation. Customize rubric and weightages, then evaluate candidates." },
     ],
   }),
   component: Index,
 });
 
+type Step = 1 | 2 | 3 | 4;
+
+interface EditableGuardrail extends SuggestedGuardrail {
+  enabled: boolean;
+  custom?: boolean;
+}
+
 function Index() {
-  const evaluate = useServerFn(evaluateResume);
+  const [step, setStep] = useState<Step>(1);
+
   const [jd, setJd] = useState("");
   const [resume, setResume] = useState("");
+
+  const [analysis, setAnalysis] = useState<JDAnalysis | null>(null);
+  const [guardrails, setGuardrails] = useState<EditableGuardrail[]>([]);
+  const [weights, setWeights] = useState<WeightageBucket[]>([]);
+  const [criticalReqs, setCriticalReqs] = useState<string[]>([]);
+
+  const [result, setResult] = useState<EvaluationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<EvaluationResult | null>(null);
 
-  const onAnalyze = async () => {
-    setError(null);
-    setResult(null);
-    setLoading(true);
+  const analyze = useServerFn(analyzeJD);
+  const evaluate = useServerFn(evaluateResume);
+
+  const onAnalyzeJD = async () => {
+    setError(null); setLoading(true);
     try {
-      const r = await evaluate({ data: { jd, resume } });
+      const a = await analyze({ data: { jd } });
+      setAnalysis(a);
+      setGuardrails(a.suggested_guardrails.map((g) => ({ ...g, enabled: true })));
+      setWeights(a.recommended_weightages.map((w) => ({ ...w })));
+      setCriticalReqs([...a.critical_requirements]);
+      setStep(2);
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  };
+
+  const lockedCriteria: LockedCriteria = useMemo(() => ({
+    guardrails: guardrails.filter((g) => g.enabled).map((g) => ({
+      name: g.name, explanation: g.explanation, importance: g.importance,
+    })),
+    weightages: weights.map((w) => ({ label: w.label, weight: w.weight })),
+    critical_requirements: criticalReqs,
+  }), [guardrails, weights, criticalReqs]);
+
+  const totalWeight = weights.reduce((s, w) => s + (Number(w.weight) || 0), 0);
+  const activeGuardrails = guardrails.filter((g) => g.enabled).length;
+
+  const onEvaluate = async () => {
+    setError(null); setLoading(true);
+    try {
+      const r = await evaluate({ data: { jd, resume, criteria: lockedCriteria } });
       setResult(r);
-      setTimeout(() => {
-        document.getElementById("report")?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
+      setStep(4);
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  };
+
+  const reset = () => {
+    setStep(1); setJd(""); setResume(""); setAnalysis(null);
+    setGuardrails([]); setWeights([]); setCriticalReqs([]); setResult(null); setError(null);
   };
 
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="mx-auto max-w-6xl px-4 pb-24 pt-10 sm:px-6">
-        <Hero />
-        <section className="mt-10 grid gap-5 md:grid-cols-2">
-          <InputCard
-            icon={<FileText className="h-4 w-4" />}
-            label="Job Description"
-            placeholder="Paste the full JD — responsibilities, requirements, must-haves…"
-            value={jd}
-            onChange={setJd}
-          />
-          <InputCard
-            icon={<FileText className="h-4 w-4" />}
-            label="Candidate Resume"
-            placeholder="Paste the candidate's resume text…"
-            value={resume}
-            onChange={setResume}
-          />
-        </section>
+      <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">
+        <Stepper current={step} />
 
-        <div className="mt-6 flex flex-col items-center gap-3">
-          <Button
-            size="lg"
-            onClick={onAnalyze}
-            disabled={loading || !jd.trim() || !resume.trim()}
-            className="h-12 gap-2 px-8 text-base shadow-[var(--shadow-elevated)]"
-            style={{ background: "var(--gradient-primary)" }}
-          >
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-            {loading ? "Analyzing…" : "Run Evaluation"}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Only information explicitly present in the resume is used. No inferences are made.
-          </p>
-          {error && (
-            <div className="mt-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              {error}
+        {error && (
+          <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {step === 1 && (
+          <Step1
+            jd={jd} setJd={setJd}
+            loading={loading} onNext={onAnalyzeJD}
+          />
+        )}
+
+        {step === 2 && analysis && (
+          <Step2
+            analysis={analysis}
+            guardrails={guardrails} setGuardrails={setGuardrails}
+            weights={weights} setWeights={setWeights}
+            criticalReqs={criticalReqs} setCriticalReqs={setCriticalReqs}
+            totalWeight={totalWeight}
+            onBack={() => setStep(1)}
+            onLock={() => setStep(3)}
+          />
+        )}
+
+        {step === 3 && (
+          <Step3
+            resume={resume} setResume={setResume}
+            activeGuardrails={activeGuardrails}
+            weights={weights}
+            criticalCount={criticalReqs.length}
+            loading={loading}
+            onBack={() => setStep(2)}
+            onEvaluate={onEvaluate}
+          />
+        )}
+
+        {step === 4 && result && (
+          <div>
+            <div className="mb-6 flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="gap-2">
+                <ArrowLeft className="h-4 w-4" /> Back to resume
+              </Button>
+              <Button variant="outline" size="sm" onClick={reset} className="gap-2">
+                <RotateCcw className="h-4 w-4" /> New evaluation
+              </Button>
             </div>
-          )}
-        </div>
-
-        {result && (
-          <div id="report" className="mt-14">
             <Report result={result} />
           </div>
         )}
@@ -103,15 +160,15 @@ function Index() {
   );
 }
 
+/* ============================ HEADER & STEPPER ============================ */
+
 function Header() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2">
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground"
-            style={{ background: "var(--gradient-primary)" }}
-          >
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground"
+               style={{ background: "var(--gradient-primary)" }}>
             <Sparkles className="h-4 w-4" />
           </div>
           <span className="text-sm font-semibold tracking-tight">Lucid Hire</span>
@@ -123,55 +180,384 @@ function Header() {
   );
 }
 
-function Hero() {
+function Stepper({ current }: { current: Step }) {
+  const steps = [
+    { n: 1, label: "JD Upload" },
+    { n: 2, label: "Analysis & Criteria" },
+    { n: 3, label: "Resume Upload" },
+    { n: 4, label: "Evaluation" },
+  ];
   return (
-    <div className="text-center">
-      <Badge variant="secondary" className="mb-4 gap-1">
-        <Shield className="h-3 w-3" /> Evidence-based · Explainable · Auditable
-      </Badge>
-      <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl">
-        Resume evaluation you can{" "}
-        <span
-          className="bg-clip-text text-transparent"
-          style={{ backgroundImage: "var(--gradient-primary)" }}
-        >
-          actually defend
-        </span>
-      </h1>
-      <p className="mx-auto mt-4 max-w-2xl text-pretty text-base text-muted-foreground">
-        Paste a job description and a resume. Get a rubric-driven decision, transparent scoring,
-        guardrail evaluation, risk flags, and interview questions — every line traceable to evidence.
-      </p>
+    <div className="flex items-center gap-2 overflow-x-auto pb-2">
+      {steps.map((s, i) => {
+        const active = current === s.n;
+        const done = current > s.n;
+        return (
+          <div key={s.n} className="flex items-center gap-2">
+            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${
+              active ? "border-primary bg-primary text-primary-foreground" :
+              done ? "border-primary/40 bg-primary/10 text-primary" :
+              "border-border bg-muted/40 text-muted-foreground"
+            }`}>
+              <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
+                active ? "bg-primary-foreground/20" : done ? "bg-primary/20" : "bg-muted"
+              }`}>{done ? <CheckCircle2 className="h-3 w-3" /> : s.n}</span>
+              <span className="whitespace-nowrap">{s.label}</span>
+            </div>
+            {i < steps.length - 1 && <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function InputCard({
-  icon, label, placeholder, value, onChange,
+/* ============================ STEP 1 ============================ */
+
+function Step1({ jd, setJd, loading, onNext }: {
+  jd: string; setJd: (v: string) => void; loading: boolean; onNext: () => void;
+}) {
+  const onFile = async (f: File | null) => {
+    if (!f) return;
+    const text = await f.text();
+    setJd(text);
+  };
+  return (
+    <div className="mt-8">
+      <div className="text-center">
+        <Badge variant="secondary" className="mb-3 gap-1"><Shield className="h-3 w-3" /> Step 1 of 4</Badge>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload your job description</h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
+          We'll derive a transparent hiring rubric you can review and customize before any candidate is evaluated.
+        </p>
+      </div>
+
+      <Card className="mt-8 overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-2.5">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <FileText className="h-4 w-4" /> Job Description
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted">
+            <Upload className="h-3.5 w-3.5" /> Upload .txt / .md
+            <input type="file" accept=".txt,.md,text/plain,text/markdown" className="hidden"
+                   onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+          </label>
+        </div>
+        <Textarea
+          value={jd} onChange={(e) => setJd(e.target.value)}
+          placeholder="Paste the full JD — responsibilities, requirements, must-haves…"
+          className="min-h-[320px] resize-y rounded-none border-0 bg-card font-mono text-[13px] leading-relaxed focus-visible:ring-0"
+        />
+      </Card>
+
+      <div className="mt-6 flex flex-col items-center gap-2">
+        <Button size="lg" onClick={onNext} disabled={loading || !jd.trim()}
+                className="h-12 gap-2 px-8 text-base shadow-[var(--shadow-elevated)]"
+                style={{ background: "var(--gradient-primary)" }}>
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
+          {loading ? "Analyzing JD…" : "Analyze JD"}
+        </Button>
+        <p className="text-xs text-muted-foreground">No candidate data is required yet.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ STEP 2 ============================ */
+
+function Step2({
+  analysis, guardrails, setGuardrails, weights, setWeights,
+  criticalReqs, setCriticalReqs, totalWeight, onBack, onLock,
 }: {
-  icon: React.ReactNode; label: string; placeholder: string;
-  value: string; onChange: (v: string) => void;
+  analysis: JDAnalysis;
+  guardrails: EditableGuardrail[];
+  setGuardrails: (g: EditableGuardrail[]) => void;
+  weights: WeightageBucket[];
+  setWeights: (w: WeightageBucket[]) => void;
+  criticalReqs: string[];
+  setCriticalReqs: (c: string[]) => void;
+  totalWeight: number;
+  onBack: () => void;
+  onLock: () => void;
+}) {
+  const valid = totalWeight === 100 && guardrails.some((g) => g.enabled);
+
+  const updateGuardrail = (id: string, patch: Partial<EditableGuardrail>) =>
+    setGuardrails(guardrails.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  const deleteGuardrail = (id: string) =>
+    setGuardrails(guardrails.filter((g) => g.id !== id));
+  const addGuardrail = () =>
+    setGuardrails([...guardrails, {
+      id: `c${Date.now()}`, name: "New guardrail", explanation: "", importance: "Medium",
+      enabled: true, custom: true,
+    }]);
+
+  const updateWeight = (key: WeightageBucket["key"], w: number) =>
+    setWeights(weights.map((b) => (b.key === key ? { ...b, weight: Math.max(0, Math.min(100, w)) } : b)));
+  const resetWeights = () =>
+    setWeights(analysis.recommended_weightages.map((w) => ({ ...w })));
+
+  return (
+    <div className="mt-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
+          <ArrowLeft className="h-4 w-4" /> Edit JD
+        </Button>
+        <Badge variant="secondary" className="gap-1"><Brain className="h-3 w-3" /> Step 2 of 4</Badge>
+      </div>
+
+      <SectionCard icon={<FileText className="h-4 w-4" />} title="Role Summary">
+        <p className="text-sm leading-relaxed text-foreground/90">{analysis.role_summary}</p>
+      </SectionCard>
+
+      <SectionCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements">
+        <div className="space-y-2">
+          {criticalReqs.map((r, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <Input value={r} onChange={(e) => {
+                const next = [...criticalReqs]; next[i] = e.target.value; setCriticalReqs(next);
+              }} className="text-sm" />
+              <Button variant="ghost" size="icon" onClick={() => setCriticalReqs(criticalReqs.filter((_, j) => j !== i))}>
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" onClick={() => setCriticalReqs([...criticalReqs, ""])} className="gap-2">
+            <Plus className="h-3.5 w-3.5" /> Add critical requirement
+          </Button>
+        </div>
+      </SectionCard>
+
+      <SectionCard icon={<Target className="h-4 w-4" />} title="Suggested Guardrails"
+        action={<Button variant="outline" size="sm" onClick={addGuardrail} className="gap-2">
+          <Plus className="h-3.5 w-3.5" /> Add guardrail
+        </Button>}>
+        <div className="space-y-3">
+          {guardrails.map((g) => (
+            <div key={g.id} className={`rounded-lg border bg-card p-3 ${g.enabled ? "border-border" : "border-border/40 opacity-60"}`}>
+              <div className="flex items-start gap-3">
+                <Switch checked={g.enabled} onCheckedChange={(v) => updateGuardrail(g.id, { enabled: v })} className="mt-1" />
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input value={g.name} onChange={(e) => updateGuardrail(g.id, { name: e.target.value })}
+                           className="h-8 max-w-md text-sm font-medium" />
+                    <ImportanceSelector value={g.importance} onChange={(v) => updateGuardrail(g.id, { importance: v })} />
+                    {g.custom && <Badge variant="secondary" className="text-[10px]">Custom</Badge>}
+                  </div>
+                  <Textarea value={g.explanation} onChange={(e) => updateGuardrail(g.id, { explanation: e.target.value })}
+                            className="min-h-[60px] text-xs" placeholder="Explanation…" />
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => deleteGuardrail(g.id)}>
+                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard icon={<Scale className="h-4 w-4" />} title="Recommended Evaluation Weightages"
+        action={<Button variant="outline" size="sm" onClick={resetWeights} className="gap-2">
+          <RotateCcw className="h-3.5 w-3.5" /> Reset to AI
+        </Button>}>
+        <div className="space-y-3">
+          {weights.map((w) => (
+            <div key={w.key} className="rounded-lg border border-border bg-card p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm font-medium">{w.label}</div>
+                <div className="flex items-center gap-2">
+                  <Input type="number" min={0} max={100} value={w.weight}
+                         onChange={(e) => updateWeight(w.key, parseInt(e.target.value || "0", 10))}
+                         className="h-8 w-20 text-right text-sm" />
+                  <span className="text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+              <Progress value={w.weight} className="mt-2 h-1.5" />
+              <p className="mt-2 text-xs text-muted-foreground">{w.rationale}</p>
+            </div>
+          ))}
+          <div className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${
+            totalWeight === 100 ? "border-[oklch(0.62_0.16_155/0.4)] bg-[oklch(0.62_0.16_155/0.08)]"
+            : "border-destructive/40 bg-destructive/5 text-destructive"
+          }`}>
+            <span className="font-medium">Total weightage</span>
+            <span className="font-mono font-semibold">{totalWeight} / 100 %</span>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard icon={<Lock className="h-4 w-4" />} title="Final Evaluation Criteria Summary">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected Guardrails ({guardrails.filter(g => g.enabled).length})</div>
+            <ul className="space-y-1 text-sm">
+              {guardrails.filter((g) => g.enabled).map((g) => (
+                <li key={g.id} className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" /> {g.name}
+                  <span className="text-xs text-muted-foreground">· {g.importance}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Final Weightages</div>
+            <ul className="space-y-1 text-sm">
+              {weights.map((w) => (
+                <li key={w.key} className="flex items-center justify-between">
+                  <span>{w.label}</span>
+                  <span className="font-mono text-xs">{w.weight}%</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="sm:col-span-2">
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Critical Requirements ({criticalReqs.length})</div>
+            <ul className="space-y-1 text-sm">
+              {criticalReqs.filter(Boolean).map((r, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /> {r}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </SectionCard>
+
+      <div className="flex flex-col items-center gap-2">
+        <Button size="lg" onClick={onLock} disabled={!valid}
+                className="h-12 gap-2 px-8 text-base shadow-[var(--shadow-elevated)]"
+                style={{ background: "var(--gradient-primary)" }}>
+          <Lock className="h-5 w-5" /> Lock Criteria & Continue
+        </Button>
+        {!valid && <p className="text-xs text-destructive">
+          {totalWeight !== 100 ? `Weightages must total exactly 100% (currently ${totalWeight}%).` : "Enable at least one guardrail."}
+        </p>}
+      </div>
+    </div>
+  );
+}
+
+function ImportanceSelector({ value, onChange }: {
+  value: "High" | "Medium" | "Low"; onChange: (v: "High" | "Medium" | "Low") => void;
+}) {
+  const opts: ("High" | "Medium" | "Low")[] = ["High", "Medium", "Low"];
+  const tone: Record<string, string> = {
+    High: "bg-destructive/10 text-destructive border-destructive/30",
+    Medium: "bg-[oklch(0.75_0.16_75/0.15)] text-[oklch(0.45_0.16_70)] border-[oklch(0.75_0.16_75/0.35)]",
+    Low: "bg-muted text-muted-foreground border-border",
+  };
+  return (
+    <div className="inline-flex overflow-hidden rounded-md border border-border">
+      {opts.map((o) => (
+        <button key={o} type="button" onClick={() => onChange(o)}
+                className={`px-2 py-0.5 text-[11px] font-medium ${value === o ? tone[o] : "text-muted-foreground hover:bg-muted"}`}>
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ============================ STEP 3 ============================ */
+
+function Step3({
+  resume, setResume, activeGuardrails, weights, criticalCount, loading, onBack, onEvaluate,
+}: {
+  resume: string; setResume: (v: string) => void;
+  activeGuardrails: number; weights: WeightageBucket[]; criticalCount: number;
+  loading: boolean; onBack: () => void; onEvaluate: () => void;
+}) {
+  const onFile = async (f: File | null) => {
+    if (!f) return;
+    const text = await f.text();
+    setResume(text);
+  };
+  return (
+    <div className="mt-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
+          <ArrowLeft className="h-4 w-4" /> Edit criteria
+        </Button>
+        <Badge variant="secondary" className="gap-1"><FileText className="h-3 w-3" /> Step 3 of 4</Badge>
+      </div>
+
+      <Card className="overflow-hidden border-[oklch(0.62_0.16_155/0.4)] bg-[oklch(0.62_0.16_155/0.06)] p-4 shadow-[var(--shadow-card)]">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Lock className="h-4 w-4 text-[oklch(0.45_0.16_155)]" /> Evaluation Criteria Locked
+          </div>
+          <div className="text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">{activeGuardrails}</span> active guardrails
+          </div>
+          <div className="text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">{criticalCount}</span> critical requirements
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            {weights.map((w) => (
+              <span key={w.key} className="rounded-full border border-border bg-card px-2 py-0.5">
+                {w.label} <span className="font-mono font-semibold">{w.weight}%</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <div className="text-center">
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload candidate resume</h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
+          The resume will be evaluated using your approved guardrails and weightages.
+        </p>
+      </div>
+
+      <Card className="overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-2.5">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <FileText className="h-4 w-4" /> Candidate Resume
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted">
+            <Upload className="h-3.5 w-3.5" /> Upload .txt / .md
+            <input type="file" accept=".txt,.md,text/plain,text/markdown" className="hidden"
+                   onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+          </label>
+        </div>
+        <Textarea value={resume} onChange={(e) => setResume(e.target.value)}
+                  placeholder="Paste the candidate's resume text…"
+                  className="min-h-[320px] resize-y rounded-none border-0 bg-card font-mono text-[13px] leading-relaxed focus-visible:ring-0" />
+      </Card>
+
+      <div className="flex flex-col items-center gap-2">
+        <Button size="lg" onClick={onEvaluate} disabled={loading || !resume.trim()}
+                className="h-12 gap-2 px-8 text-base shadow-[var(--shadow-elevated)]"
+                style={{ background: "var(--gradient-primary)" }}>
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+          {loading ? "Evaluating candidate…" : "Evaluate Candidate"}
+        </Button>
+        <p className="text-xs text-muted-foreground">Only information explicitly present in the resume is used.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ SHARED ============================ */
+
+function SectionCard({ icon, title, children, action }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode; action?: React.ReactNode;
 }) {
   return (
     <Card className="overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-2.5">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          {icon}
-          {label}
+      <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-muted/30 px-5 py-3 text-sm font-semibold">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</span>
+          {title}
         </div>
-        <span className="text-[11px] text-muted-foreground">{value.length.toLocaleString()} chars</span>
+        {action}
       </div>
-      <Textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="min-h-[260px] resize-y rounded-none border-0 bg-card font-mono text-[13px] leading-relaxed focus-visible:ring-0"
-      />
+      <div className="p-5">{children}</div>
     </Card>
   );
 }
 
-/* ============================ REPORT ============================ */
+/* ============================ REPORT (STEP 4) ============================ */
 
 function Report({ result }: { result: EvaluationResult }) {
   const kw = useMemo(
@@ -195,7 +581,7 @@ function Report({ result }: { result: EvaluationResult }) {
             {result.critical_requirements?.map((c, i) => (
               <li key={i} className="flex items-start gap-2">
                 {c.met ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[oklch(var(--success))]" style={{ color: "oklch(0.62 0.16 155)" }} />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "oklch(0.62 0.16 155)" }} />
                 ) : (
                   <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                 )}
@@ -209,6 +595,36 @@ function Report({ result }: { result: EvaluationResult }) {
         </ReportCard>
       </SectionGrid>
 
+      <SectionGrid>
+        <ReportCard icon={<Scale className="h-4 w-4" />} title="Key Insights">
+          <SubList title="Strengths" tone="success" items={result.strengths} kw={kw} />
+          <SubList title="Concerns" tone="warning" items={result.tradeoffs} kw={kw} />
+        </ReportCard>
+        <ReportCard icon={<AlertOctagon className="h-4 w-4" />} title="Risk Alerts & Missing Requirements">
+          <SubList title="Risk Alerts" tone="destructive" items={result.risk_alerts} kw={kw} />
+          <SubList title="Missing Requirements" tone="destructive" items={result.missing_requirements} kw={kw} />
+        </ReportCard>
+      </SectionGrid>
+
+      <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Recommended Screening Questions (Top 5)" full>
+        <ol className="space-y-3 text-sm">
+          {(result.top_5_questions || []).map((q, i) => (
+            <li key={i} className="rounded-lg border border-border/60 bg-card px-4 py-3">
+              <div className="flex gap-3">
+                <span className="font-mono text-xs text-primary">{String(i + 1).padStart(2, "0")}</span>
+                <div className="flex-1 space-y-1.5">
+                  <div className="font-medium"><HL text={q.question} keywords={kw} /></div>
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground/80">Why: </span>
+                    <HL text={q.why} keywords={kw} />
+                  </div>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </ReportCard>
+
       <ReportCard icon={<Target className="h-4 w-4" />} title="Guardrail Evaluation" full>
         <GuardrailTable guardrails={result.guardrails} kw={kw} />
       </ReportCard>
@@ -216,26 +632,6 @@ function Report({ result }: { result: EvaluationResult }) {
       <ReportCard icon={<Calculator className="h-4 w-4" />} title="Score Calculation" full>
         <ScoreBreakdown result={result} />
       </ReportCard>
-
-      <SectionGrid>
-        <ReportCard icon={<Scale className="h-4 w-4" />} title="Tradeoffs & Missing Requirements">
-          <SubList title="Strengths" tone="success" items={result.strengths} kw={kw} />
-          <SubList title="Missing Requirements" tone="destructive" items={result.missing_requirements} kw={kw} />
-          <SubList title="Tradeoffs" tone="warning" items={result.tradeoffs} kw={kw} />
-        </ReportCard>
-
-        <ReportCard icon={<AlertOctagon className="h-4 w-4" />} title="Candidate Risk Alerts">
-          <ul className="space-y-2 text-sm">
-            {(result.risk_alerts || []).map((r, i) => (
-              <li key={i} className="flex items-start gap-2 rounded-md border border-destructive/15 bg-destructive/5 px-3 py-2">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                <span><HL text={r} keywords={kw} /></span>
-              </li>
-            ))}
-            {!result.risk_alerts?.length && <li className="text-sm text-muted-foreground">No risks flagged.</li>}
-          </ul>
-        </ReportCard>
-      </SectionGrid>
 
       <ReportCard icon={<Brain className="h-4 w-4" />} title="AI Self-Audit" full>
         <div className="grid gap-6 md:grid-cols-3">
@@ -245,33 +641,21 @@ function Report({ result }: { result: EvaluationResult }) {
         </div>
       </ReportCard>
 
-      <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Interview Intelligence" full>
-        <div>
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top 5 Questions</div>
-          <ol className="mb-6 space-y-2 text-sm">
-            {(result.top_5_questions || []).map((q, i) => (
-              <li key={i} className="flex gap-3 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-                <span className="font-mono text-xs text-primary">{String(i + 1).padStart(2, "0")}</span>
-                <span><HL text={q} keywords={kw} /></span>
-              </li>
-            ))}
-          </ol>
-          <Separator className="my-4" />
-          <div className="space-y-3">
-            {(result.interview_questions || []).map((q, i) => (
-              <details key={i} className="group rounded-lg border border-border/60 bg-card px-4 py-3 open:shadow-[var(--shadow-card)]">
-                <summary className="flex cursor-pointer items-start justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
-                  <div className="flex-1"><HL text={q.question} keywords={kw} /></div>
-                  <Badge variant="secondary" className="shrink-0 text-[10px]">{q.category}</Badge>
-                </summary>
-                <div className="mt-3 grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
-                  <Field label="Why it matters" text={q.why_matters} kw={kw} />
-                  <Field label="Strong answer" text={q.strong_answer} kw={kw} />
-                  <Field label="Risk signal" text={q.risk_signal} kw={kw} />
-                </div>
-              </details>
-            ))}
-          </div>
+      <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Deeper Interview Intelligence" full>
+        <div className="space-y-3">
+          {(result.interview_questions || []).map((q, i) => (
+            <details key={i} className="group rounded-lg border border-border/60 bg-card px-4 py-3 open:shadow-[var(--shadow-card)]">
+              <summary className="flex cursor-pointer items-start justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                <div className="flex-1"><HL text={q.question} keywords={kw} /></div>
+                <Badge variant="secondary" className="shrink-0 text-[10px]">{q.category}</Badge>
+              </summary>
+              <div className="mt-3 grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
+                <Field label="Why it matters" text={q.why_matters} kw={kw} />
+                <Field label="Strong answer" text={q.strong_answer} kw={kw} />
+                <Field label="Risk signal" text={q.risk_signal} kw={kw} />
+              </div>
+            </details>
+          ))}
         </div>
       </ReportCard>
     </div>
@@ -287,7 +671,7 @@ function DecisionHero({ result }: { result: EvaluationResult }) {
         <div className="flex flex-wrap items-start justify-between gap-6 text-primary-foreground">
           <div className="max-w-2xl">
             <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest opacity-80">
-              <Shield className="h-3.5 w-3.5" /> Hiring Recommendation
+              <Shield className="h-3.5 w-3.5" /> Candidate Snapshot
             </div>
             <div className="flex items-center gap-3">
               <meta.Icon className="h-7 w-7" />
@@ -319,11 +703,8 @@ function ScoreDial({ value }: { value: number }) {
     <div className="relative h-24 w-24">
       <svg viewBox="0 0 96 96" className="h-24 w-24 -rotate-90">
         <circle cx="48" cy="48" r={r} stroke="currentColor" strokeOpacity="0.25" strokeWidth="8" fill="none" />
-        <circle
-          cx="48" cy="48" r={r}
-          stroke="white" strokeWidth="8" fill="none" strokeLinecap="round"
-          strokeDasharray={`${dash} ${c - dash}`}
-        />
+        <circle cx="48" cy="48" r={r} stroke="white" strokeWidth="8" fill="none" strokeLinecap="round"
+                strokeDasharray={`${dash} ${c - dash}`} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-primary-foreground">
         <div className="text-2xl font-bold leading-none">{value}</div>
@@ -363,7 +744,7 @@ function GuardrailTable({ guardrails, kw }: { guardrails: GuardrailEval[]; kw: s
               <td className="px-3 py-3"><MatchBadge status={g.match_status} /></td>
               <td className="px-3 py-3">
                 <div className="font-mono text-xs">{g.contribution.toFixed(1)} pts</div>
-                <Progress value={(g.contribution / g.weight) * 100} className="mt-1 h-1.5" />
+                <Progress value={g.weight ? (g.contribution / g.weight) * 100 : 0} className="mt-1 h-1.5" />
               </td>
               <td className="px-3 py-3 text-xs text-foreground/80">
                 <div className="mb-1.5 font-medium text-foreground">Explanation</div>
@@ -408,10 +789,7 @@ function ScoreBreakdown({ result }: { result: EvaluationResult }) {
             <div className="w-48 truncate font-medium text-foreground">{g.requirement}</div>
             <div className="flex-1">
               <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${g.contribution}%`, background: "var(--gradient-primary)" }}
-                />
+                <div className="h-full rounded-full" style={{ width: `${g.contribution}%`, background: "var(--gradient-primary)" }} />
               </div>
             </div>
             <div className="w-32 text-right font-mono text-muted-foreground">
@@ -437,9 +815,9 @@ function SectionGrid({ children }: { children: React.ReactNode }) {
   return <section className="grid gap-6 md:grid-cols-2">{children}</section>;
 }
 
-function ReportCard({
-  icon, title, children, full,
-}: { icon: React.ReactNode; title: string; children: React.ReactNode; full?: boolean }) {
+function ReportCard({ icon, title, children, full }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode; full?: boolean;
+}) {
   return (
     <Card className={`overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)] ${full ? "md:col-span-2" : ""}`}>
       <div className="flex items-center gap-2 border-b border-border/70 bg-muted/30 px-5 py-3 text-sm font-semibold">
@@ -451,9 +829,9 @@ function ReportCard({
   );
 }
 
-function SubList({
-  title, tone, items, kw, dense,
-}: { title: string; tone: "success" | "warning" | "destructive" | "info"; items?: string[]; kw: string[]; dense?: boolean }) {
+function SubList({ title, tone, items, kw, dense }: {
+  title: string; tone: "success" | "warning" | "destructive" | "info"; items?: string[]; kw: string[]; dense?: boolean;
+}) {
   const dot: Record<string, string> = {
     success: "bg-[oklch(0.62_0.16_155)]",
     warning: "bg-[oklch(0.75_0.16_75)]",
@@ -485,13 +863,10 @@ function Field({ label, text, kw }: { label: string; text: string; kw: string[] 
   );
 }
 
-/** Highlight rubric keywords in any text. */
 function HL({ text, keywords }: { text: string; keywords: string[] }) {
   if (!text) return null;
   if (!keywords?.length) return <>{text}</>;
-  const escaped = keywords
-    .map((k) => k.trim())
-    .filter((k) => k.length > 1)
+  const escaped = keywords.map((k) => k.trim()).filter((k) => k.length > 1)
     .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   if (!escaped.length) return <>{text}</>;
   const re = new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
