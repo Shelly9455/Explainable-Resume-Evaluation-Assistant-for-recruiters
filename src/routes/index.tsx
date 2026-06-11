@@ -495,25 +495,13 @@ function HL({ text, keywords }: { text: string; keywords: string[] }) {
     .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   if (!escaped.length) return <>{text}</>;
   const re = new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
+  const set = new Set(keywords.map((k) => k.toLowerCase()));
   const parts = text.split(re);
   return (
     <>
       {parts.map((p, i) =>
-        re.test(p) ? <span key={i} className="rubric-kw">{p}</span> : <span key={i}>{p}</span>,
+        set.has(p.toLowerCase()) ? <span key={i} className="rubric-kw">{p}</span> : <span key={i}>{p}</span>,
       )}
     </>
-  );
-}
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
   );
 }
