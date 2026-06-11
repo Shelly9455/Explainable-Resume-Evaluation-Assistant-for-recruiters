@@ -81,7 +81,7 @@ function Index() {
             style={{ background: "var(--gradient-primary)" }}
           >
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-            {loading ? "Analyzing with Claude…" : "Run Evaluation"}
+            {loading ? "Analyzing…" : "Run Evaluation"}
           </Button>
           <p className="text-xs text-muted-foreground">
             Only information explicitly present in the resume is used. No inferences are made.
@@ -117,7 +117,7 @@ function Header() {
           <span className="text-sm font-semibold tracking-tight">Lucid Hire</span>
           <Badge variant="secondary" className="ml-1 text-[10px]">Beta</Badge>
         </div>
-        <div className="text-xs text-muted-foreground">Powered by Claude</div>
+        <div className="text-xs text-muted-foreground">Powered by Groq · Llama 3.3</div>
       </div>
     </header>
   );
