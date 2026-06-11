@@ -87,39 +87,43 @@ export const evaluateResume = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<EvaluationResult> => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured.");
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) throw new Error("GROQ_API_KEY is not configured.");
 
     const userMessage = `JOB DESCRIPTION:\n${data.jd}\n\n---\n\nRESUME:\n${data.resume}\n\nReturn the JSON object now.`;
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${groqKey}`,
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: "llama-3.3-70b-versatile",
+        temperature: 0.2,
         max_tokens: 8000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userMessage }],
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
       }),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Claude API error ${res.status}: ${text.slice(0, 500)}`);
+      throw new Error(`Groq API error ${res.status}: ${text.slice(0, 500)}`);
     }
 
     const payload = (await res.json()) as {
-      content: { type: string; text: string }[];
+      choices: { message: { content: string } }[];
     };
-    const raw = payload.content?.find((c) => c.type === "text")?.text ?? "";
+    const raw = payload.choices?.[0]?.message?.content ?? "";
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Claude did not return JSON.");
+    if (!jsonMatch) throw new Error("Model did not return JSON.");
     try {
       return JSON.parse(jsonMatch[0]) as EvaluationResult;
     } catch (e) {
-      throw new Error("Failed to parse Claude JSON: " + (e as Error).message);
+      throw new Error("Failed to parse JSON: " + (e as Error).message);
     }
   });
