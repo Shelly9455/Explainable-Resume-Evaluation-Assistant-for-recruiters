@@ -10,6 +10,7 @@ import {
   type LockedCriteria,
   type SuggestedGuardrail,
   type WeightageBucket,
+  type CriticalRequirement,
 } from "@/lib/evaluate.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   FileText, Sparkles, Loader2, CheckCircle2, AlertTriangle, XCircle,
   Shield, Target, Scale, AlertOctagon, Brain, MessageSquareQuote, Calculator,
-  ArrowRight, ArrowLeft, Upload, Lock, Plus, Trash2, RotateCcw, Wand2,
+  ArrowRight, ArrowLeft, Upload, Lock, Plus, Trash2, RotateCcw, Wand2, ThumbsUp, ThumbsDown, Clock,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -36,10 +37,16 @@ export const Route = createFileRoute("/")({
 });
 
 type Step = 1 | 2 | 3 | 4;
+type ReviewStatus = "pending" | "approved" | "rejected";
 
 interface EditableGuardrail extends SuggestedGuardrail {
-  enabled: boolean;
+  status: ReviewStatus;
   custom?: boolean;
+}
+
+interface EditableCriticalReq extends CriticalRequirement {
+  id: string;
+  status: ReviewStatus;
 }
 
 function Index() {
@@ -51,7 +58,7 @@ function Index() {
   const [analysis, setAnalysis] = useState<JDAnalysis | null>(null);
   const [guardrails, setGuardrails] = useState<EditableGuardrail[]>([]);
   const [weights, setWeights] = useState<WeightageBucket[]>([]);
-  const [criticalReqs, setCriticalReqs] = useState<string[]>([]);
+  const [criticalReqs, setCriticalReqs] = useState<EditableCriticalReq[]>([]);
 
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -65,24 +72,30 @@ function Index() {
     try {
       const a = await analyze({ data: { jd } });
       setAnalysis(a);
-      setGuardrails(a.suggested_guardrails.map((g) => ({ ...g, enabled: true })));
+      setGuardrails(a.suggested_guardrails.map((g) => ({ ...g, status: "pending" as ReviewStatus })));
       setWeights(a.recommended_weightages.map((w) => ({ ...w })));
-      setCriticalReqs([...a.critical_requirements]);
+      setCriticalReqs(
+        a.critical_requirements.map((r, i) => ({ ...r, id: `cr${i}`, status: "pending" as ReviewStatus })),
+      );
       setStep(2);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
   };
 
   const lockedCriteria: LockedCriteria = useMemo(() => ({
-    guardrails: guardrails.filter((g) => g.enabled).map((g) => ({
+    guardrails: guardrails.filter((g) => g.status === "approved").map((g) => ({
       name: g.name, explanation: g.explanation, importance: g.importance,
     })),
     weightages: weights.map((w) => ({ label: w.label, weight: w.weight })),
-    critical_requirements: criticalReqs,
+    critical_requirements: criticalReqs.filter((r) => r.status === "approved").map((r) => r.requirement),
   }), [guardrails, weights, criticalReqs]);
 
   const totalWeight = weights.reduce((s, w) => s + (Number(w.weight) || 0), 0);
-  const activeGuardrails = guardrails.filter((g) => g.enabled).length;
+  const activeGuardrails = guardrails.filter((g) => g.status === "approved").length;
+  const approvedCriticals = criticalReqs.filter((r) => r.status === "approved").length;
+  const pendingReview =
+    guardrails.filter((g) => g.status === "pending").length +
+    criticalReqs.filter((r) => r.status === "pending").length;
 
   const onEvaluate = async () => {
     setError(null); setLoading(true);
@@ -125,6 +138,9 @@ function Index() {
             weights={weights} setWeights={setWeights}
             criticalReqs={criticalReqs} setCriticalReqs={setCriticalReqs}
             totalWeight={totalWeight}
+            approvedGuardrails={activeGuardrails}
+            approvedCriticals={approvedCriticals}
+            pendingReview={pendingReview}
             onBack={() => setStep(1)}
             onLock={() => setStep(3)}
           />
@@ -135,7 +151,7 @@ function Index() {
             resume={resume} setResume={setResume}
             activeGuardrails={activeGuardrails}
             weights={weights}
-            criticalCount={criticalReqs.length}
+            criticalCount={approvedCriticals}
             loading={loading}
             onBack={() => setStep(2)}
             onEvaluate={onEvaluate}
