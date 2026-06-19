@@ -283,20 +283,26 @@ function Step1({ jd, setJd, loading, onNext }: {
 
 function Step2({
   analysis, guardrails, setGuardrails, weights, setWeights,
-  criticalReqs, setCriticalReqs, totalWeight, onBack, onLock,
+  criticalReqs, setCriticalReqs, totalWeight,
+  approvedGuardrails, approvedCriticals, pendingReview,
+  onBack, onLock,
 }: {
   analysis: JDAnalysis;
   guardrails: EditableGuardrail[];
   setGuardrails: (g: EditableGuardrail[]) => void;
   weights: WeightageBucket[];
   setWeights: (w: WeightageBucket[]) => void;
-  criticalReqs: string[];
-  setCriticalReqs: (c: string[]) => void;
+  criticalReqs: EditableCriticalReq[];
+  setCriticalReqs: (c: EditableCriticalReq[]) => void;
   totalWeight: number;
+  approvedGuardrails: number;
+  approvedCriticals: number;
+  pendingReview: number;
   onBack: () => void;
   onLock: () => void;
 }) {
-  const valid = totalWeight === 100 && guardrails.some((g) => g.enabled);
+  void totalWeight;
+  const valid = guardrails.some((g) => g.status === "approved");
 
   const updateGuardrail = (id: string, patch: Partial<EditableGuardrail>) =>
     setGuardrails(guardrails.map((g) => (g.id === id ? { ...g, ...patch } : g)));
@@ -305,13 +311,15 @@ function Step2({
   const addGuardrail = () =>
     setGuardrails([...guardrails, {
       id: `c${Date.now()}`, name: "New guardrail", explanation: "", importance: "Medium",
-      enabled: true, custom: true,
+      reason: "", risk_if_ignored: "",
+      status: "approved", custom: true,
     }]);
 
-  const updateWeight = (key: WeightageBucket["key"], w: number) =>
-    setWeights(weights.map((b) => (b.key === key ? { ...b, weight: Math.max(0, Math.min(100, w)) } : b)));
   const resetWeights = () =>
     setWeights(analysis.recommended_weightages.map((w) => ({ ...w })));
+
+  const updateCritical = (id: string, patch: Partial<EditableCriticalReq>) =>
+    setCriticalReqs(criticalReqs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
   return (
     <div className="mt-8 space-y-6">
@@ -322,25 +330,57 @@ function Step2({
         <Badge variant="secondary" className="gap-1"><Brain className="h-3 w-3" /> Step 2 of 4</Badge>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatusTile icon={<Target className="h-4 w-4" />} label="Guardrails approved"
+          value={`${approvedGuardrails} / ${guardrails.length}`} tone="primary" />
+        <StatusTile icon={<Shield className="h-4 w-4" />} label="Requirements approved"
+          value={`${approvedCriticals} / ${criticalReqs.length}`} tone="success" />
+        <StatusTile icon={<Clock className="h-4 w-4" />} label="Pending review"
+          value={`${pendingReview}`} tone={pendingReview > 0 ? "warning" : "muted"} />
+      </div>
+
       <SectionCard icon={<FileText className="h-4 w-4" />} title="Role Summary">
         <p className="text-sm leading-relaxed text-foreground/90">{analysis.role_summary}</p>
       </SectionCard>
 
       <SectionCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements">
-        <div className="space-y-2">
-          {criticalReqs.map((r, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <Input value={r} onChange={(e) => {
-                const next = [...criticalReqs]; next[i] = e.target.value; setCriticalReqs(next);
-              }} className="text-sm" />
-              <Button variant="ghost" size="icon" onClick={() => setCriticalReqs(criticalReqs.filter((_, j) => j !== i))}>
-                <Trash2 className="h-4 w-4 text-muted-foreground" />
-              </Button>
+        <div className="space-y-3">
+          {criticalReqs.map((r) => (
+            <div key={r.id} className={`rounded-lg border bg-card p-3 ${
+              r.status === "approved" ? "border-[oklch(0.62_0.16_155/0.45)]" :
+              r.status === "rejected" ? "border-destructive/30 opacity-60" : "border-border"
+            }`}>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex-1 text-sm font-semibold">{r.requirement}</div>
+                <StatusPill status={r.status} />
+              </div>
+              <dl className="mt-2 space-y-1.5 text-xs">
+                <div className="flex gap-1.5">
+                  <dt className="shrink-0 font-semibold text-muted-foreground">Why critical:</dt>
+                  <dd className="text-foreground/85">{r.why_critical}</dd>
+                </div>
+                <div className="flex gap-1.5">
+                  <dt className="shrink-0 font-semibold text-muted-foreground">Impact on decision:</dt>
+                  <dd className="text-foreground/85">{r.impact}</dd>
+                </div>
+              </dl>
+              <div className="mt-3 flex items-center gap-2">
+                <Button size="sm" variant={r.status === "approved" ? "default" : "outline"}
+                  onClick={() => updateCritical(r.id, { status: "approved" })} className="h-7 gap-1.5 text-xs">
+                  <ThumbsUp className="h-3.5 w-3.5" /> {r.status === "approved" ? "Approved" : "Approve"}
+                </Button>
+                <Button size="sm" variant={r.status === "rejected" ? "destructive" : "outline"}
+                  onClick={() => updateCritical(r.id, { status: "rejected" })} className="h-7 gap-1.5 text-xs">
+                  <ThumbsDown className="h-3.5 w-3.5" /> {r.status === "rejected" ? "Rejected" : "Reject"}
+                </Button>
+                <Button size="sm" variant="ghost"
+                  onClick={() => setCriticalReqs(criticalReqs.filter((x) => x.id !== r.id))}
+                  className="ml-auto h-7 w-7 p-0">
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </div>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => setCriticalReqs([...criticalReqs, ""])} className="gap-2">
-            <Plus className="h-3.5 w-3.5" /> Add critical requirement
-          </Button>
         </div>
       </SectionCard>
 
@@ -350,21 +390,46 @@ function Step2({
         </Button>}>
         <div className="space-y-3">
           {guardrails.map((g) => (
-            <div key={g.id} className={`rounded-lg border bg-card p-3 ${g.enabled ? "border-border" : "border-border/40 opacity-60"}`}>
-              <div className="flex items-start gap-3">
-                <Switch checked={g.enabled} onCheckedChange={(v) => updateGuardrail(g.id, { enabled: v })} className="mt-1" />
-                <div className="flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input value={g.name} onChange={(e) => updateGuardrail(g.id, { name: e.target.value })}
-                           className="h-8 max-w-md text-sm font-medium" />
-                    <ImportanceSelector value={g.importance} onChange={(v) => updateGuardrail(g.id, { importance: v })} />
-                    {g.custom && <Badge variant="secondary" className="text-[10px]">Custom</Badge>}
-                  </div>
-                  <Textarea value={g.explanation} onChange={(e) => updateGuardrail(g.id, { explanation: e.target.value })}
-                            className="min-h-[60px] text-xs" placeholder="Explanation…" />
+            <div key={g.id} className={`rounded-lg border bg-card p-3 ${
+              g.status === "approved" ? "border-[oklch(0.62_0.16_155/0.45)]" :
+              g.status === "rejected" ? "border-destructive/30 opacity-60" : "border-border"
+            }`}>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-sm font-semibold">{g.name}</div>
+                  <ImportanceBadge value={g.importance} />
+                  {g.custom && <Badge variant="secondary" className="text-[10px]">Custom</Badge>}
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => deleteGuardrail(g.id)}>
-                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                <StatusPill status={g.status} />
+              </div>
+              {g.explanation && (
+                <p className="mt-1.5 text-xs leading-relaxed text-foreground/85">{g.explanation}</p>
+              )}
+              <dl className="mt-2 space-y-1.5 text-xs">
+                {g.reason && (
+                  <div className="flex gap-1.5">
+                    <dt className="shrink-0 font-semibold text-muted-foreground">Reason:</dt>
+                    <dd className="text-foreground/85">{g.reason}</dd>
+                  </div>
+                )}
+                {g.risk_if_ignored && (
+                  <div className="flex gap-1.5">
+                    <dt className="shrink-0 font-semibold text-muted-foreground">Risk if ignored:</dt>
+                    <dd className="text-foreground/85">{g.risk_if_ignored}</dd>
+                  </div>
+                )}
+              </dl>
+              <div className="mt-3 flex items-center gap-2">
+                <Button size="sm" variant={g.status === "approved" ? "default" : "outline"}
+                  onClick={() => updateGuardrail(g.id, { status: "approved" })} className="h-7 gap-1.5 text-xs">
+                  <ThumbsUp className="h-3.5 w-3.5" /> {g.status === "approved" ? "Approved" : "Approve"}
+                </Button>
+                <Button size="sm" variant={g.status === "rejected" ? "destructive" : "outline"}
+                  onClick={() => updateGuardrail(g.id, { status: "rejected" })} className="h-7 gap-1.5 text-xs">
+                  <ThumbsDown className="h-3.5 w-3.5" /> {g.status === "rejected" ? "Rejected" : "Reject"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => deleteGuardrail(g.id)} className="ml-auto h-7 w-7 p-0">
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
               </div>
             </div>
@@ -381,33 +446,21 @@ function Step2({
             <div key={w.key} className="rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm font-medium">{w.label}</div>
-                <div className="flex items-center gap-2">
-                  <Input type="number" min={0} max={100} value={w.weight}
-                         onChange={(e) => updateWeight(w.key, parseInt(e.target.value || "0", 10))}
-                         className="h-8 w-20 text-right text-sm" />
-                  <span className="text-xs text-muted-foreground">%</span>
-                </div>
+                <div className="font-mono text-sm font-semibold text-primary">{w.weight}%</div>
               </div>
               <Progress value={w.weight} className="mt-2 h-1.5" />
               <p className="mt-2 text-xs text-muted-foreground">{w.rationale}</p>
             </div>
           ))}
-          <div className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${
-            totalWeight === 100 ? "border-[oklch(0.62_0.16_155/0.4)] bg-[oklch(0.62_0.16_155/0.08)]"
-            : "border-destructive/40 bg-destructive/5 text-destructive"
-          }`}>
-            <span className="font-medium">Total weightage</span>
-            <span className="font-mono font-semibold">{totalWeight} / 100 %</span>
-          </div>
         </div>
       </SectionCard>
 
       <SectionCard icon={<Lock className="h-4 w-4" />} title="Final Evaluation Criteria Summary">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Selected Guardrails ({guardrails.filter(g => g.enabled).length})</div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approved Guardrails ({approvedGuardrails})</div>
             <ul className="space-y-1 text-sm">
-              {guardrails.filter((g) => g.enabled).map((g) => (
+              {guardrails.filter((g) => g.status === "approved").map((g) => (
                 <li key={g.id} className="flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-primary" /> {g.name}
                   <span className="text-xs text-muted-foreground">· {g.importance}</span>
@@ -427,11 +480,11 @@ function Step2({
             </ul>
           </div>
           <div className="sm:col-span-2">
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Critical Requirements ({criticalReqs.length})</div>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approved Critical Requirements ({approvedCriticals})</div>
             <ul className="space-y-1 text-sm">
-              {criticalReqs.filter(Boolean).map((r, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /> {r}
+              {criticalReqs.filter((r) => r.status === "approved").map((r) => (
+                <li key={r.id} className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /> {r.requirement}
                 </li>
               ))}
             </ul>
@@ -445,31 +498,60 @@ function Step2({
                 style={{ background: "var(--gradient-primary)" }}>
           <Lock className="h-5 w-5" /> Lock Criteria & Continue
         </Button>
-        {!valid && <p className="text-xs text-destructive">
-          {totalWeight !== 100 ? `Weightages must total exactly 100% (currently ${totalWeight}%).` : "Enable at least one guardrail."}
-        </p>}
+        {!valid && <p className="text-xs text-destructive">Approve at least one guardrail to continue.</p>}
       </div>
     </div>
   );
 }
 
-function ImportanceSelector({ value, onChange }: {
-  value: "High" | "Medium" | "Low"; onChange: (v: "High" | "Medium" | "Low") => void;
-}) {
-  const opts: ("High" | "Medium" | "Low")[] = ["High", "Medium", "Low"];
+function ImportanceBadge({ value }: { value: "High" | "Medium" | "Low" }) {
   const tone: Record<string, string> = {
     High: "bg-destructive/10 text-destructive border-destructive/30",
     Medium: "bg-[oklch(0.75_0.16_75/0.15)] text-[oklch(0.45_0.16_70)] border-[oklch(0.75_0.16_75/0.35)]",
     Low: "bg-muted text-muted-foreground border-border",
   };
   return (
-    <div className="inline-flex overflow-hidden rounded-md border border-border">
-      {opts.map((o) => (
-        <button key={o} type="button" onClick={() => onChange(o)}
-                className={`px-2 py-0.5 text-[11px] font-medium ${value === o ? tone[o] : "text-muted-foreground hover:bg-muted"}`}>
-          {o}
-        </button>
-      ))}
+    <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${tone[value]}`}>
+      {value}
+    </span>
+  );
+}
+
+function StatusPill({ status }: { status: ReviewStatus }) {
+  if (status === "approved") return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-[oklch(0.62_0.16_155/0.45)] bg-[oklch(0.62_0.16_155/0.1)] px-2 py-0.5 text-[10px] font-semibold text-[oklch(0.4_0.15_155)]">
+      <CheckCircle2 className="h-3 w-3" /> Approved
+    </span>
+  );
+  if (status === "rejected") return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+      <XCircle className="h-3 w-3" /> Rejected
+    </span>
+  );
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+      <Clock className="h-3 w-3" /> Pending review
+    </span>
+  );
+}
+
+function StatusTile({ icon, label, value, tone }: {
+  icon: React.ReactNode; label: string; value: string;
+  tone: "primary" | "success" | "warning" | "muted";
+}) {
+  const toneCls: Record<string, string> = {
+    primary: "border-primary/30 bg-primary/5 text-primary",
+    success: "border-[oklch(0.62_0.16_155/0.4)] bg-[oklch(0.62_0.16_155/0.06)] text-[oklch(0.4_0.15_155)]",
+    warning: "border-[oklch(0.65_0.19_42/0.4)] bg-[oklch(0.65_0.19_42/0.08)] text-[oklch(0.5_0.19_42)]",
+    muted: "border-border bg-muted/40 text-muted-foreground",
+  };
+  return (
+    <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${toneCls[tone]}`}>
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-background/60">{icon}</div>
+      <div className="flex-1">
+        <div className="text-[11px] font-medium uppercase tracking-wide opacity-80">{label}</div>
+        <div className="text-base font-bold leading-tight">{value}</div>
+      </div>
     </div>
   );
 }
