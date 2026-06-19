@@ -7,6 +7,8 @@ export interface SuggestedGuardrail {
   name: string;
   explanation: string;
   importance: "High" | "Medium" | "Low";
+  reason?: string;
+  risk_if_ignored?: string;
 }
 
 export interface WeightageBucket {
@@ -16,9 +18,15 @@ export interface WeightageBucket {
   rationale: string;
 }
 
+export interface CriticalRequirement {
+  requirement: string;
+  why_critical: string;
+  impact: string;
+}
+
 export interface JDAnalysis {
   role_summary: string;
-  critical_requirements: string[];
+  critical_requirements: CriticalRequirement[];
   suggested_guardrails: SuggestedGuardrail[];
   recommended_weightages: WeightageBucket[];
 }
