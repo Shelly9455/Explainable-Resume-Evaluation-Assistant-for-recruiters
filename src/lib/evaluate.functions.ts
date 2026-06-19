@@ -110,8 +110,8 @@ async function callGroq(system: string, user: string) {
 const ANALYZE_SYSTEM = `You are an Explainable Hiring Rubric Designer. Given ONLY a Job Description, derive:
 
 1. A concise role summary (2-3 sentences).
-2. Critical (non-negotiable) requirements as short strings.
-3. 5-8 suggested guardrails. For each: a name (3-6 words), a 1-2 sentence explanation, and importance (High|Medium|Low).
+2. Critical (non-negotiable) requirements. For each: a short "requirement" string, a 1-sentence "why_critical" explanation, and a 1-sentence "impact" describing how missing it changes the hiring decision.
+3. 5-8 suggested guardrails. For each: a name (3-6 words), a 1-2 sentence explanation, importance (High|Medium|Low), a "reason" (why this guardrail matters for THIS role), and a "risk_if_ignored" (what could go wrong if it is skipped).
 4. Recommended evaluation weightages across these FIVE fixed buckets (must sum to exactly 100):
    - skills_match
    - experience_match
@@ -123,8 +123,8 @@ const ANALYZE_SYSTEM = `You are an Explainable Hiring Rubric Designer. Given ONL
 Return STRICT JSON ONLY, no markdown:
 {
   "role_summary": string,
-  "critical_requirements": string[],
-  "suggested_guardrails": [{ "id": string, "name": string, "explanation": string, "importance": "High"|"Medium"|"Low" }],
+  "critical_requirements": [{ "requirement": string, "why_critical": string, "impact": string }],
+  "suggested_guardrails": [{ "id": string, "name": string, "explanation": string, "importance": "High"|"Medium"|"Low", "reason": string, "risk_if_ignored": string }],
   "recommended_weightages": [
     { "key": "skills_match", "label": "Skills Match", "weight": number, "rationale": string },
     { "key": "experience_match", "label": "Experience Match", "weight": number, "rationale": string },
