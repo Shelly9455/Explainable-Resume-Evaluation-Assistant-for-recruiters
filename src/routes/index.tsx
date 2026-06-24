@@ -312,7 +312,7 @@ function Step2({
     setGuardrails([...guardrails, {
       id: `c${Date.now()}`, name: "New guardrail", explanation: "", importance: "Medium",
       reason: "", risk_if_ignored: "",
-      status: "approved", custom: true,
+      status: "pending", custom: true,
     }]);
 
   const resetWeights = () =>
@@ -322,9 +322,20 @@ function Step2({
     const clamped = Math.max(0, Math.min(100, Math.round(next)));
     setWeights(weights.map((w) => (w.key === key ? { ...w, weight: clamped } : w)));
   };
+  const updateWeightLabel = (key: WeightageBucket["key"], label: string) =>
+    setWeights(weights.map((w) => (w.key === key ? { ...w, label } : w)));
+  const deleteWeight = (key: WeightageBucket["key"]) =>
+    setWeights(weights.filter((w) => w.key !== key));
+  const addWeight = () =>
+    setWeights([...weights, { key: `w${Date.now()}`, label: "New bucket", weight: 0, rationale: "Custom weightage" }]);
 
   const updateCritical = (id: string, patch: Partial<EditableCriticalReq>) =>
     setCriticalReqs(criticalReqs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const addCritical = () =>
+    setCriticalReqs([
+      ...criticalReqs,
+      { id: `cr${Date.now()}`, requirement: "New requirement", why_critical: "", impact: "", status: "pending" },
+    ]);
 
   return (
     <div className="mt-8 space-y-6">
@@ -348,7 +359,10 @@ function Step2({
         <p className="text-sm leading-relaxed text-foreground/90">{analysis.role_summary}</p>
       </SectionCard>
 
-      <SectionCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements">
+      <SectionCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements"
+        action={<Button variant="outline" size="sm" onClick={addCritical} className="gap-2">
+          <Plus className="h-3.5 w-3.5" /> Add requirement
+        </Button>}>
         <div className="space-y-3">
           {criticalReqs.map((r) => (
             <div key={r.id} className={`rounded-lg border bg-card p-3 ${
@@ -356,12 +370,19 @@ function Step2({
               r.status === "rejected" ? "border-destructive/30 opacity-60" : "border-border"
             }`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex-1 text-sm font-semibold">{r.requirement}</div>
+                <Input
+                  value={r.requirement}
+                  onChange={(e) => updateCritical(r.id, { requirement: e.target.value })}
+                  className="h-8 flex-1 min-w-[200px] text-sm font-semibold"
+                  placeholder="Requirement"
+                />
                 <StatusPill status={r.status} />
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <FieldBlock tone="info" label="Why critical" text={r.why_critical} />
-                <FieldBlock tone="warning" label="Impact on decision" text={r.impact} />
+                <EditableFieldBlock tone="info" label="Why critical" value={r.why_critical}
+                  onChange={(v) => updateCritical(r.id, { why_critical: v })} />
+                <EditableFieldBlock tone="warning" label="Impact on decision" value={r.impact}
+                  onChange={(v) => updateCritical(r.id, { impact: v })} />
               </div>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant={r.status === "approved" ? "default" : "outline"}
@@ -394,19 +415,37 @@ function Step2({
               g.status === "rejected" ? "border-destructive/30 opacity-60" : "border-border"
             }`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-semibold">{g.name}</div>
-                  <ImportanceBadge value={g.importance} />
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                  <Input
+                    value={g.name}
+                    onChange={(e) => updateGuardrail(g.id, { name: e.target.value })}
+                    className="h-8 min-w-[180px] flex-1 text-sm font-semibold"
+                    placeholder="Guardrail name"
+                  />
+                  <select
+                    value={g.importance}
+                    onChange={(e) => updateGuardrail(g.id, { importance: e.target.value as "High" | "Medium" | "Low" })}
+                    className="h-8 rounded-md border border-input bg-card px-2 text-xs font-medium"
+                  >
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
                   {g.custom && <Badge variant="secondary" className="text-[10px]">Custom</Badge>}
                 </div>
                 <StatusPill status={g.status} />
               </div>
-              {g.explanation && (
-                <p className="mt-1.5 text-xs leading-relaxed text-foreground/85">{g.explanation}</p>
-              )}
+              <Textarea
+                value={g.explanation}
+                onChange={(e) => updateGuardrail(g.id, { explanation: e.target.value })}
+                placeholder="Short explanation of this guardrail"
+                className="mt-2 min-h-[56px] resize-y text-xs leading-relaxed"
+              />
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {g.reason && <FieldBlock tone="info" label="Reason" text={g.reason} />}
-                {g.risk_if_ignored && <FieldBlock tone="danger" label="Risk if ignored" text={g.risk_if_ignored} />}
+                <EditableFieldBlock tone="info" label="Reason" value={g.reason ?? ""}
+                  onChange={(v) => updateGuardrail(g.id, { reason: v })} />
+                <EditableFieldBlock tone="danger" label="Risk if ignored" value={g.risk_if_ignored ?? ""}
+                  onChange={(v) => updateGuardrail(g.id, { risk_if_ignored: v })} />
               </div>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant={g.status === "approved" ? "default" : "outline"}
@@ -427,14 +466,24 @@ function Step2({
       </SectionCard>
 
       <SectionCard icon={<Scale className="h-4 w-4" />} title="Recommended Evaluation Weightages"
-        action={<Button variant="outline" size="sm" onClick={resetWeights} className="gap-2">
-          <RotateCcw className="h-3.5 w-3.5" /> Reset to AI
-        </Button>}>
+        action={<div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={addWeight} className="gap-2">
+            <Plus className="h-3.5 w-3.5" /> Add bucket
+          </Button>
+          <Button variant="outline" size="sm" onClick={resetWeights} className="gap-2">
+            <RotateCcw className="h-3.5 w-3.5" /> Reset to AI
+          </Button>
+        </div>}>
         <div className="space-y-3">
           {weights.map((w) => (
             <div key={w.key} className="rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm font-medium">{w.label}</div>
+                <Input
+                  value={w.label}
+                  onChange={(e) => updateWeightLabel(w.key, e.target.value)}
+                  className="h-8 min-w-[160px] flex-1 text-sm font-medium"
+                  placeholder="Bucket label"
+                />
                 <div className="flex items-center gap-1.5">
                   <Input
                     type="number" min={0} max={100}
@@ -443,6 +492,10 @@ function Step2({
                     className="h-8 w-16 text-right font-mono text-sm"
                   />
                   <span className="text-xs font-semibold text-muted-foreground">%</span>
+                  <Button size="sm" variant="ghost" onClick={() => deleteWeight(w.key)}
+                    className="h-8 w-8 p-0">
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
                 </div>
               </div>
               <Slider
@@ -675,6 +728,30 @@ function FieldBlock({ tone, label, text }: {
     <div className={`rounded-md border border-border border-l-4 px-2.5 py-2 ${toneCls[tone]}`}>
       <div className="text-[10px] font-bold uppercase tracking-wide">{label}</div>
       <div className="mt-0.5 text-xs leading-relaxed text-foreground/85">{text}</div>
+    </div>
+  );
+}
+
+function EditableFieldBlock({ tone, label, value, onChange, placeholder }: {
+  tone: "info" | "warning" | "danger";
+  label: string; value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const toneCls: Record<string, string> = {
+    info: "border-l-primary bg-primary/5 text-primary",
+    warning: "border-l-[oklch(0.65_0.19_42)] bg-[oklch(0.65_0.19_42/0.07)] text-[oklch(0.5_0.19_42)]",
+    danger: "border-l-destructive bg-destructive/5 text-destructive",
+  };
+  return (
+    <div className={`rounded-md border border-border border-l-4 px-2.5 py-2 ${toneCls[tone]}`}>
+      <div className="text-[10px] font-bold uppercase tracking-wide">{label}</div>
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder ?? label}
+        className="mt-1 min-h-[52px] resize-y border-0 bg-transparent p-0 text-xs leading-relaxed text-foreground/85 shadow-none focus-visible:ring-0"
+      />
     </div>
   );
 }
