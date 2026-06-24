@@ -415,19 +415,37 @@ function Step2({
               g.status === "rejected" ? "border-destructive/30 opacity-60" : "border-border"
             }`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-sm font-semibold">{g.name}</div>
-                  <ImportanceBadge value={g.importance} />
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                  <Input
+                    value={g.name}
+                    onChange={(e) => updateGuardrail(g.id, { name: e.target.value })}
+                    className="h-8 min-w-[180px] flex-1 text-sm font-semibold"
+                    placeholder="Guardrail name"
+                  />
+                  <select
+                    value={g.importance}
+                    onChange={(e) => updateGuardrail(g.id, { importance: e.target.value as "High" | "Medium" | "Low" })}
+                    className="h-8 rounded-md border border-input bg-card px-2 text-xs font-medium"
+                  >
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
                   {g.custom && <Badge variant="secondary" className="text-[10px]">Custom</Badge>}
                 </div>
                 <StatusPill status={g.status} />
               </div>
-              {g.explanation && (
-                <p className="mt-1.5 text-xs leading-relaxed text-foreground/85">{g.explanation}</p>
-              )}
+              <Textarea
+                value={g.explanation}
+                onChange={(e) => updateGuardrail(g.id, { explanation: e.target.value })}
+                placeholder="Short explanation of this guardrail"
+                className="mt-2 min-h-[56px] resize-y text-xs leading-relaxed"
+              />
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {g.reason && <FieldBlock tone="info" label="Reason" text={g.reason} />}
-                {g.risk_if_ignored && <FieldBlock tone="danger" label="Risk if ignored" text={g.risk_if_ignored} />}
+                <EditableFieldBlock tone="info" label="Reason" value={g.reason ?? ""}
+                  onChange={(v) => updateGuardrail(g.id, { reason: v })} />
+                <EditableFieldBlock tone="danger" label="Risk if ignored" value={g.risk_if_ignored ?? ""}
+                  onChange={(v) => updateGuardrail(g.id, { risk_if_ignored: v })} />
               </div>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant={g.status === "approved" ? "default" : "outline"}
