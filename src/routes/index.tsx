@@ -700,6 +700,30 @@ function FieldBlock({ tone, label, text }: {
   );
 }
 
+function EditableFieldBlock({ tone, label, value, onChange, placeholder }: {
+  tone: "info" | "warning" | "danger";
+  label: string; value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const toneCls: Record<string, string> = {
+    info: "border-l-primary bg-primary/5 text-primary",
+    warning: "border-l-[oklch(0.65_0.19_42)] bg-[oklch(0.65_0.19_42/0.07)] text-[oklch(0.5_0.19_42)]",
+    danger: "border-l-destructive bg-destructive/5 text-destructive",
+  };
+  return (
+    <div className={`rounded-md border border-border border-l-4 px-2.5 py-2 ${toneCls[tone]}`}>
+      <div className="text-[10px] font-bold uppercase tracking-wide">{label}</div>
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder ?? label}
+        className="mt-1 min-h-[52px] resize-y border-0 bg-transparent p-0 text-xs leading-relaxed text-foreground/85 shadow-none focus-visible:ring-0"
+      />
+    </div>
+  );
+}
+
 /* ============================ REPORT (STEP 4) ============================ */
 
 function Report({ result }: { result: EvaluationResult }) {
