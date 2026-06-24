@@ -466,14 +466,24 @@ function Step2({
       </SectionCard>
 
       <SectionCard icon={<Scale className="h-4 w-4" />} title="Recommended Evaluation Weightages"
-        action={<Button variant="outline" size="sm" onClick={resetWeights} className="gap-2">
-          <RotateCcw className="h-3.5 w-3.5" /> Reset to AI
-        </Button>}>
+        action={<div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={addWeight} className="gap-2">
+            <Plus className="h-3.5 w-3.5" /> Add bucket
+          </Button>
+          <Button variant="outline" size="sm" onClick={resetWeights} className="gap-2">
+            <RotateCcw className="h-3.5 w-3.5" /> Reset to AI
+          </Button>
+        </div>}>
         <div className="space-y-3">
           {weights.map((w) => (
             <div key={w.key} className="rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm font-medium">{w.label}</div>
+                <Input
+                  value={w.label}
+                  onChange={(e) => updateWeightLabel(w.key, e.target.value)}
+                  className="h-8 min-w-[160px] flex-1 text-sm font-medium"
+                  placeholder="Bucket label"
+                />
                 <div className="flex items-center gap-1.5">
                   <Input
                     type="number" min={0} max={100}
@@ -482,6 +492,10 @@ function Step2({
                     className="h-8 w-16 text-right font-mono text-sm"
                   />
                   <span className="text-xs font-semibold text-muted-foreground">%</span>
+                  <Button size="sm" variant="ghost" onClick={() => deleteWeight(w.key)}
+                    className="h-8 w-8 p-0">
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
                 </div>
               </div>
               <Slider
