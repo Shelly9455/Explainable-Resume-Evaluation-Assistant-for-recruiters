@@ -18,6 +18,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { extractFileText } from "@/lib/pdf-extract";
 import {
   FileText, Sparkles, Loader2, CheckCircle2, AlertTriangle, XCircle,
   Shield, Target, Scale, AlertOctagon, Brain, MessageSquareQuote, Calculator,
@@ -233,7 +236,7 @@ function Step1({ jd, setJd, loading, onNext }: {
 }) {
   const onFile = async (f: File | null) => {
     if (!f) return;
-    const text = await f.text();
+    const text = await extractFileText(f);
     setJd(text);
   };
   return (
@@ -252,8 +255,8 @@ function Step1({ jd, setJd, loading, onNext }: {
             <FileText className="h-4 w-4" /> Job Description
           </div>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted">
-            <Upload className="h-3.5 w-3.5" /> Upload .txt / .md
-            <input type="file" accept=".txt,.md,text/plain,text/markdown" className="hidden"
+            <Upload className="h-3.5 w-3.5" /> Upload .pdf / .txt / .md
+            <input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" className="hidden"
                    onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
           </label>
         </div>
@@ -299,7 +302,6 @@ function Step2({
   onBack: () => void;
   onLock: () => void;
 }) {
-  void totalWeight;
   const valid = guardrails.some((g) => g.status === "approved");
 
   const updateGuardrail = (id: string, patch: Partial<EditableGuardrail>) =>
@@ -315,6 +317,11 @@ function Step2({
 
   const resetWeights = () =>
     setWeights(analysis.recommended_weightages.map((w) => ({ ...w })));
+
+  const updateWeight = (key: WeightageBucket["key"], next: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(next)));
+    setWeights(weights.map((w) => (w.key === key ? { ...w, weight: clamped } : w)));
+  };
 
   const updateCritical = (id: string, patch: Partial<EditableCriticalReq>) =>
     setCriticalReqs(criticalReqs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -352,16 +359,10 @@ function Step2({
                 <div className="flex-1 text-sm font-semibold">{r.requirement}</div>
                 <StatusPill status={r.status} />
               </div>
-              <dl className="mt-2 space-y-1.5 text-xs">
-                <div className="flex gap-1.5">
-                  <dt className="shrink-0 font-semibold text-muted-foreground">Why critical:</dt>
-                  <dd className="text-foreground/85">{r.why_critical}</dd>
-                </div>
-                <div className="flex gap-1.5">
-                  <dt className="shrink-0 font-semibold text-muted-foreground">Impact on decision:</dt>
-                  <dd className="text-foreground/85">{r.impact}</dd>
-                </div>
-              </dl>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <FieldBlock tone="info" label="Why critical" text={r.why_critical} />
+                <FieldBlock tone="warning" label="Impact on decision" text={r.impact} />
+              </div>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant={r.status === "approved" ? "default" : "outline"}
                   onClick={() => updateCritical(r.id, { status: "approved" })} className="h-7 gap-1.5 text-xs">
@@ -403,20 +404,10 @@ function Step2({
               {g.explanation && (
                 <p className="mt-1.5 text-xs leading-relaxed text-foreground/85">{g.explanation}</p>
               )}
-              <dl className="mt-2 space-y-1.5 text-xs">
-                {g.reason && (
-                  <div className="flex gap-1.5">
-                    <dt className="shrink-0 font-semibold text-muted-foreground">Reason:</dt>
-                    <dd className="text-foreground/85">{g.reason}</dd>
-                  </div>
-                )}
-                {g.risk_if_ignored && (
-                  <div className="flex gap-1.5">
-                    <dt className="shrink-0 font-semibold text-muted-foreground">Risk if ignored:</dt>
-                    <dd className="text-foreground/85">{g.risk_if_ignored}</dd>
-                  </div>
-                )}
-              </dl>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {g.reason && <FieldBlock tone="info" label="Reason" text={g.reason} />}
+                {g.risk_if_ignored && <FieldBlock tone="danger" label="Risk if ignored" text={g.risk_if_ignored} />}
+              </div>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant={g.status === "approved" ? "default" : "outline"}
                   onClick={() => updateGuardrail(g.id, { status: "approved" })} className="h-7 gap-1.5 text-xs">
@@ -444,12 +435,31 @@ function Step2({
             <div key={w.key} className="rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm font-medium">{w.label}</div>
-                <div className="font-mono text-sm font-semibold text-primary">{w.weight}%</div>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number" min={0} max={100}
+                    value={w.weight}
+                    onChange={(e) => updateWeight(w.key, Number(e.target.value))}
+                    className="h-8 w-16 text-right font-mono text-sm"
+                  />
+                  <span className="text-xs font-semibold text-muted-foreground">%</span>
+                </div>
               </div>
-              <Progress value={w.weight} className="mt-2 h-1.5" />
+              <Slider
+                value={[w.weight]} min={0} max={100} step={1}
+                onValueChange={(v) => updateWeight(w.key, v[0] ?? 0)}
+                className="mt-3"
+              />
               <p className="mt-2 text-xs text-muted-foreground">{w.rationale}</p>
             </div>
           ))}
+          <div className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium ${
+            totalWeight === 100 ? "border-[oklch(0.62_0.16_155/0.4)] bg-[oklch(0.62_0.16_155/0.06)] text-[oklch(0.4_0.15_155)]"
+              : "border-destructive/40 bg-destructive/5 text-destructive"
+          }`}>
+            <span>Total weight</span>
+            <span className="font-mono font-semibold">{totalWeight}% {totalWeight === 100 ? "✓" : "(must equal 100%)"}</span>
+          </div>
         </div>
       </SectionCard>
 
@@ -565,7 +575,7 @@ function Step3({
 }) {
   const onFile = async (f: File | null) => {
     if (!f) return;
-    const text = await f.text();
+    const text = await extractFileText(f);
     setResume(text);
   };
   return (
@@ -611,8 +621,8 @@ function Step3({
             <FileText className="h-4 w-4" /> Candidate Resume
           </div>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted">
-            <Upload className="h-3.5 w-3.5" /> Upload .txt / .md
-            <input type="file" accept=".txt,.md,text/plain,text/markdown" className="hidden"
+            <Upload className="h-3.5 w-3.5" /> Upload .pdf / .txt / .md
+            <input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" className="hidden"
                    onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
           </label>
         </div>
@@ -650,6 +660,22 @@ function SectionCard({ icon, title, children, action }: {
       </div>
       <div className="p-5">{children}</div>
     </Card>
+  );
+}
+
+function FieldBlock({ tone, label, text }: {
+  tone: "info" | "warning" | "danger"; label: string; text: string;
+}) {
+  const toneCls: Record<string, string> = {
+    info: "border-l-primary bg-primary/5 text-primary",
+    warning: "border-l-[oklch(0.65_0.19_42)] bg-[oklch(0.65_0.19_42/0.07)] text-[oklch(0.5_0.19_42)]",
+    danger: "border-l-destructive bg-destructive/5 text-destructive",
+  };
+  return (
+    <div className={`rounded-md border border-border border-l-4 px-2.5 py-2 ${toneCls[tone]}`}>
+      <div className="text-[10px] font-bold uppercase tracking-wide">{label}</div>
+      <div className="mt-0.5 text-xs leading-relaxed text-foreground/85">{text}</div>
+    </div>
   );
 }
 
