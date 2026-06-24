@@ -355,16 +355,10 @@ function Step2({
                 <div className="flex-1 text-sm font-semibold">{r.requirement}</div>
                 <StatusPill status={r.status} />
               </div>
-              <dl className="mt-2 space-y-1.5 text-xs">
-                <div className="flex gap-1.5">
-                  <dt className="shrink-0 font-semibold text-muted-foreground">Why critical:</dt>
-                  <dd className="text-foreground/85">{r.why_critical}</dd>
-                </div>
-                <div className="flex gap-1.5">
-                  <dt className="shrink-0 font-semibold text-muted-foreground">Impact on decision:</dt>
-                  <dd className="text-foreground/85">{r.impact}</dd>
-                </div>
-              </dl>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <FieldBlock tone="info" label="Why critical" text={r.why_critical} />
+                <FieldBlock tone="warning" label="Impact on decision" text={r.impact} />
+              </div>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant={r.status === "approved" ? "default" : "outline"}
                   onClick={() => updateCritical(r.id, { status: "approved" })} className="h-7 gap-1.5 text-xs">
@@ -406,20 +400,10 @@ function Step2({
               {g.explanation && (
                 <p className="mt-1.5 text-xs leading-relaxed text-foreground/85">{g.explanation}</p>
               )}
-              <dl className="mt-2 space-y-1.5 text-xs">
-                {g.reason && (
-                  <div className="flex gap-1.5">
-                    <dt className="shrink-0 font-semibold text-muted-foreground">Reason:</dt>
-                    <dd className="text-foreground/85">{g.reason}</dd>
-                  </div>
-                )}
-                {g.risk_if_ignored && (
-                  <div className="flex gap-1.5">
-                    <dt className="shrink-0 font-semibold text-muted-foreground">Risk if ignored:</dt>
-                    <dd className="text-foreground/85">{g.risk_if_ignored}</dd>
-                  </div>
-                )}
-              </dl>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {g.reason && <FieldBlock tone="info" label="Reason" text={g.reason} />}
+                {g.risk_if_ignored && <FieldBlock tone="danger" label="Risk if ignored" text={g.risk_if_ignored} />}
+              </div>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant={g.status === "approved" ? "default" : "outline"}
                   onClick={() => updateGuardrail(g.id, { status: "approved" })} className="h-7 gap-1.5 text-xs">
