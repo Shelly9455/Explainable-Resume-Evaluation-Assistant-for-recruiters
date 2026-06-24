@@ -302,7 +302,6 @@ function Step2({
   onBack: () => void;
   onLock: () => void;
 }) {
-  void totalWeight;
   const valid = guardrails.some((g) => g.status === "approved");
 
   const updateGuardrail = (id: string, patch: Partial<EditableGuardrail>) =>
@@ -661,6 +660,22 @@ function SectionCard({ icon, title, children, action }: {
       </div>
       <div className="p-5">{children}</div>
     </Card>
+  );
+}
+
+function FieldBlock({ tone, label, text }: {
+  tone: "info" | "warning" | "danger"; label: string; text: string;
+}) {
+  const toneCls: Record<string, string> = {
+    info: "border-l-primary bg-primary/5 text-primary",
+    warning: "border-l-[oklch(0.65_0.19_42)] bg-[oklch(0.65_0.19_42/0.07)] text-[oklch(0.5_0.19_42)]",
+    danger: "border-l-destructive bg-destructive/5 text-destructive",
+  };
+  return (
+    <div className={`rounded-md border border-border border-l-4 px-2.5 py-2 ${toneCls[tone]}`}>
+      <div className="text-[10px] font-bold uppercase tracking-wide">{label}</div>
+      <div className="mt-0.5 text-xs leading-relaxed text-foreground/85">{text}</div>
+    </div>
   );
 }
 
