@@ -359,7 +359,10 @@ function Step2({
         <p className="text-sm leading-relaxed text-foreground/90">{analysis.role_summary}</p>
       </SectionCard>
 
-      <SectionCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements">
+      <SectionCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements"
+        action={<Button variant="outline" size="sm" onClick={addCritical} className="gap-2">
+          <Plus className="h-3.5 w-3.5" /> Add requirement
+        </Button>}>
         <div className="space-y-3">
           {criticalReqs.map((r) => (
             <div key={r.id} className={`rounded-lg border bg-card p-3 ${
@@ -367,12 +370,19 @@ function Step2({
               r.status === "rejected" ? "border-destructive/30 opacity-60" : "border-border"
             }`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex-1 text-sm font-semibold">{r.requirement}</div>
+                <Input
+                  value={r.requirement}
+                  onChange={(e) => updateCritical(r.id, { requirement: e.target.value })}
+                  className="h-8 flex-1 min-w-[200px] text-sm font-semibold"
+                  placeholder="Requirement"
+                />
                 <StatusPill status={r.status} />
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <FieldBlock tone="info" label="Why critical" text={r.why_critical} />
-                <FieldBlock tone="warning" label="Impact on decision" text={r.impact} />
+                <EditableFieldBlock tone="info" label="Why critical" value={r.why_critical}
+                  onChange={(v) => updateCritical(r.id, { why_critical: v })} />
+                <EditableFieldBlock tone="warning" label="Impact on decision" value={r.impact}
+                  onChange={(v) => updateCritical(r.id, { impact: v })} />
               </div>
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant={r.status === "approved" ? "default" : "outline"}
