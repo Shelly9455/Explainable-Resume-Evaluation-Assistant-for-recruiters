@@ -12,7 +12,7 @@ export interface SuggestedGuardrail {
 }
 
 export interface WeightageBucket {
-  key: "skills_match" | "experience_match" | "domain_relevance" | "critical_requirements" | "risk_factors";
+  key: string;
   label: string;
   weight: number;
   rationale: string;
