@@ -319,6 +319,11 @@ function Step2({
   const resetWeights = () =>
     setWeights(analysis.recommended_weightages.map((w) => ({ ...w })));
 
+  const updateWeight = (key: WeightageBucket["key"], next: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(next)));
+    setWeights(weights.map((w) => (w.key === key ? { ...w, weight: clamped } : w)));
+  };
+
   const updateCritical = (id: string, patch: Partial<EditableCriticalReq>) =>
     setCriticalReqs(criticalReqs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
@@ -431,12 +436,31 @@ function Step2({
             <div key={w.key} className="rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm font-medium">{w.label}</div>
-                <div className="font-mono text-sm font-semibold text-primary">{w.weight}%</div>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number" min={0} max={100}
+                    value={w.weight}
+                    onChange={(e) => updateWeight(w.key, Number(e.target.value))}
+                    className="h-8 w-16 text-right font-mono text-sm"
+                  />
+                  <span className="text-xs font-semibold text-muted-foreground">%</span>
+                </div>
               </div>
-              <Progress value={w.weight} className="mt-2 h-1.5" />
+              <Slider
+                value={[w.weight]} min={0} max={100} step={1}
+                onValueChange={(v) => updateWeight(w.key, v[0] ?? 0)}
+                className="mt-3"
+              />
               <p className="mt-2 text-xs text-muted-foreground">{w.rationale}</p>
             </div>
           ))}
+          <div className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium ${
+            totalWeight === 100 ? "border-[oklch(0.62_0.16_155/0.4)] bg-[oklch(0.62_0.16_155/0.06)] text-[oklch(0.4_0.15_155)]"
+              : "border-destructive/40 bg-destructive/5 text-destructive"
+          }`}>
+            <span>Total weight</span>
+            <span className="font-mono font-semibold">{totalWeight}% {totalWeight === 100 ? "✓" : "(must equal 100%)"}</span>
+          </div>
         </div>
       </SectionCard>
 
