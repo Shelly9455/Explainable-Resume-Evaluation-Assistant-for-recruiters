@@ -312,7 +312,7 @@ function Step2({
     setGuardrails([...guardrails, {
       id: `c${Date.now()}`, name: "New guardrail", explanation: "", importance: "Medium",
       reason: "", risk_if_ignored: "",
-      status: "approved", custom: true,
+      status: "pending", custom: true,
     }]);
 
   const resetWeights = () =>
@@ -322,9 +322,20 @@ function Step2({
     const clamped = Math.max(0, Math.min(100, Math.round(next)));
     setWeights(weights.map((w) => (w.key === key ? { ...w, weight: clamped } : w)));
   };
+  const updateWeightLabel = (key: WeightageBucket["key"], label: string) =>
+    setWeights(weights.map((w) => (w.key === key ? { ...w, label } : w)));
+  const deleteWeight = (key: WeightageBucket["key"]) =>
+    setWeights(weights.filter((w) => w.key !== key));
+  const addWeight = () =>
+    setWeights([...weights, { key: `w${Date.now()}`, label: "New bucket", weight: 0, rationale: "Custom weightage" }]);
 
   const updateCritical = (id: string, patch: Partial<EditableCriticalReq>) =>
     setCriticalReqs(criticalReqs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const addCritical = () =>
+    setCriticalReqs([
+      ...criticalReqs,
+      { id: `cr${Date.now()}`, requirement: "New requirement", why_critical: "", impact: "", status: "pending" },
+    ]);
 
   return (
     <div className="mt-8 space-y-6">
