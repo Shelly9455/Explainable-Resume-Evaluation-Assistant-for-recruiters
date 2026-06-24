@@ -568,7 +568,7 @@ function Step3({
 }) {
   const onFile = async (f: File | null) => {
     if (!f) return;
-    const text = await f.text();
+    const text = await extractFileText(f);
     setResume(text);
   };
   return (
@@ -614,8 +614,8 @@ function Step3({
             <FileText className="h-4 w-4" /> Candidate Resume
           </div>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted">
-            <Upload className="h-3.5 w-3.5" /> Upload .txt / .md
-            <input type="file" accept=".txt,.md,text/plain,text/markdown" className="hidden"
+            <Upload className="h-3.5 w-3.5" /> Upload .pdf / .txt / .md
+            <input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" className="hidden"
                    onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
           </label>
         </div>
