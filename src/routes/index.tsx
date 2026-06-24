@@ -18,6 +18,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { extractFileText } from "@/lib/pdf-extract";
 import {
   FileText, Sparkles, Loader2, CheckCircle2, AlertTriangle, XCircle,
   Shield, Target, Scale, AlertOctagon, Brain, MessageSquareQuote, Calculator,
@@ -233,7 +236,7 @@ function Step1({ jd, setJd, loading, onNext }: {
 }) {
   const onFile = async (f: File | null) => {
     if (!f) return;
-    const text = await f.text();
+    const text = await extractFileText(f);
     setJd(text);
   };
   return (
@@ -252,8 +255,8 @@ function Step1({ jd, setJd, loading, onNext }: {
             <FileText className="h-4 w-4" /> Job Description
           </div>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted">
-            <Upload className="h-3.5 w-3.5" /> Upload .txt / .md
-            <input type="file" accept=".txt,.md,text/plain,text/markdown" className="hidden"
+            <Upload className="h-3.5 w-3.5" /> Upload .pdf / .txt / .md
+            <input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" className="hidden"
                    onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
           </label>
         </div>
