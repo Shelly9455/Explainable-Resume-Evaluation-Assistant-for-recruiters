@@ -13,7 +13,7 @@ export interface SuggestedGuardrail {
 
 export interface WeightageBucket {
   key: string;
-  label: string;
+  guardrail_requirement: string;
   weight: number;
   rationale: string;
 }

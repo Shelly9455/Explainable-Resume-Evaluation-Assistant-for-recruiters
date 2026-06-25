@@ -87,7 +87,7 @@ function Index() {
     guardrails: guardrails.filter((g) => g.status === "approved").map((g) => ({
       name: g.name, explanation: g.explanation, importance: g.importance,
     })),
-    weightages: weights.map((w) => ({ label: w.label, weight: w.weight })),
+    weightages: weights.map((w) => ({ guardrail_requirement: w.guardrail_requirement, weight: w.weight })),
     critical_requirements: criticalReqs.filter((r) => r.status === "approved").map((r) => r.requirement),
   }), [guardrails, weights, criticalReqs]);
 
