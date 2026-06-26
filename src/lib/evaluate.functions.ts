@@ -118,7 +118,7 @@ const ANALYZE_SYSTEM = `You are an Explainable Hiring Rubric Designer. Given ONL
    - domain_relevance
    - critical_requirements
    - risk_factors
-   For each bucket include an integer weight (0-100) and a short rationale explaining why this weighting fits THIS role.
+   For each bucket include a short "guardrail_requirement" description (5-12 words summarizing what is being weighted), an integer "weight" (0-100), and a "rationale" (1 sentence explaining why this weighting fits THIS role).
 
 Return STRICT JSON ONLY, no markdown:
 {
@@ -126,11 +126,11 @@ Return STRICT JSON ONLY, no markdown:
   "critical_requirements": [{ "requirement": string, "why_critical": string, "impact": string }],
   "suggested_guardrails": [{ "id": string, "name": string, "explanation": string, "importance": "High"|"Medium"|"Low", "reason": string, "risk_if_ignored": string }],
   "recommended_weightages": [
-    { "key": "skills_match", "label": "Skills Match", "weight": number, "rationale": string },
-    { "key": "experience_match", "label": "Experience Match", "weight": number, "rationale": string },
-    { "key": "domain_relevance", "label": "Domain Relevance", "weight": number, "rationale": string },
-    { "key": "critical_requirements", "label": "Critical Requirements", "weight": number, "rationale": string },
-    { "key": "risk_factors", "label": "Risk Factors", "weight": number, "rationale": string }
+    { "key": "skills_match", "guardrail_requirement": string, "weight": number, "rationale": string },
+    { "key": "experience_match", "guardrail_requirement": string, "weight": number, "rationale": string },
+    { "key": "domain_relevance", "guardrail_requirement": string, "weight": number, "rationale": string },
+    { "key": "critical_requirements", "guardrail_requirement": string, "weight": number, "rationale": string },
+    { "key": "risk_factors", "guardrail_requirement": string, "weight": number, "rationale": string }
   ]
 }
 
