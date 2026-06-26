@@ -87,7 +87,7 @@ function Index() {
     guardrails: guardrails.filter((g) => g.status === "approved").map((g) => ({
       name: g.name, explanation: g.explanation, importance: g.importance,
     })),
-    weightages: weights.map((w) => ({ guardrail_requirement: w.guardrail_requirement, weight: w.weight })),
+    weightages: weights.map((w) => ({ label: w.guardrail_requirement, weight: w.weight })),
     critical_requirements: criticalReqs.filter((r) => r.status === "approved").map((r) => r.requirement),
   }), [guardrails, weights, criticalReqs]);
 
@@ -323,11 +323,11 @@ function Step2({
     setWeights(weights.map((w) => (w.key === key ? { ...w, weight: clamped } : w)));
   };
   const updateWeightLabel = (key: WeightageBucket["key"], label: string) =>
-    setWeights(weights.map((w) => (w.key === key ? { ...w, label } : w)));
+    setWeights(weights.map((w) => (w.key === key ? { ...w, guardrail_requirement: label } : w)));
   const deleteWeight = (key: WeightageBucket["key"]) =>
     setWeights(weights.filter((w) => w.key !== key));
   const addWeight = () =>
-    setWeights([...weights, { key: `w${Date.now()}`, label: "New bucket", weight: 0, rationale: "Custom weightage" }]);
+    setWeights([...weights, { key: `w${Date.now()}`, guardrail_requirement: "New bucket", weight: 0, rationale: "Custom weightage" }]);
 
   const updateCritical = (id: string, patch: Partial<EditableCriticalReq>) =>
     setCriticalReqs(criticalReqs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -479,7 +479,7 @@ function Step2({
             <div key={w.key} className="rounded-lg border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Input
-                  value={w.label}
+                  value={w.guardrail_requirement}
                   onChange={(e) => updateWeightLabel(w.key, e.target.value)}
                   className="h-8 min-w-[160px] flex-1 text-sm font-medium"
                   placeholder="Bucket label"
@@ -534,7 +534,7 @@ function Step2({
             <ul className="space-y-1 text-sm">
               {weights.map((w) => (
                 <li key={w.key} className="flex items-center justify-between">
-                  <span>{w.label}</span>
+                  <span>{w.guardrail_requirement}</span>
                   <span className="font-mono text-xs">{w.weight}%</span>
                 </li>
               ))}
@@ -654,7 +654,7 @@ function Step3({
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             {weights.map((w) => (
               <span key={w.key} className="rounded-full border border-border bg-card px-2 py-0.5">
-                {w.label} <span className="font-mono font-semibold">{w.weight}%</span>
+                {w.guardrail_requirement} <span className="font-mono font-semibold">{w.weight}%</span>
               </span>
             ))}
           </div>
