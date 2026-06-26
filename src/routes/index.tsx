@@ -309,18 +309,49 @@ function Step2({
   const deleteGuardrail = (id: string) =>
     setGuardrails(guardrails.filter((g) => g.id !== id));
   const addGuardrail = () =>
-    setGuardrails([...guardrails, {
+    setGuardrails([{
       id: `c${Date.now()}`, name: "New guardrail", explanation: "", importance: "Medium",
       reason: "", risk_if_ignored: "",
       status: "pending", custom: true,
-    }]);
+    }, ...guardrails]);
 
   const resetWeights = () =>
     setWeights(analysis.recommended_weightages.map((w) => ({ ...w })));
 
   const updateWeight = (key: WeightageBucket["key"], next: number) => {
     const clamped = Math.max(0, Math.min(100, Math.round(next)));
-    setWeights(weights.map((w) => (w.key === key ? { ...w, weight: clamped } : w)));
+    const current = weights.find((w) => w.key === key);
+    if (!current) return;
+    const delta = clamped - current.weight;
+    if (delta === 0) return;
+    const others = weights.filter((w) => w.key !== key);
+    const othersTotal = others.reduce((s, w) => s + w.weight, 0);
+    // Distribute -delta across other buckets proportionally; fall back to equal split.
+    let remaining = -delta;
+    const adjusted = others.map((w, i) => {
+      let share: number;
+      if (i === others.length - 1) {
+        share = remaining;
+      } else if (othersTotal > 0) {
+        share = Math.round((-delta) * (w.weight / othersTotal));
+      } else {
+        share = Math.round(-delta / others.length);
+      }
+      remaining -= share;
+      const nextW = Math.max(0, Math.min(100, w.weight + share));
+      return { ...w, weight: nextW };
+    });
+    const next2 = weights.map((w) =>
+      w.key === key ? { ...w, weight: clamped } : adjusted.find((a) => a.key === w.key)!,
+    );
+    // Final correction so total is exactly 100.
+    const total = next2.reduce((s, w) => s + w.weight, 0);
+    if (total !== 100 && next2.length > 1) {
+      const diff = 100 - total;
+      const target = next2.find((w) => w.key !== key);
+      if (target) target.weight = Math.max(0, Math.min(100, target.weight + diff));
+    }
+    setWeights(next2);
   };
   const updateWeightLabel = (key: WeightageBucket["key"], label: string) =>
     setWeights(weights.map((w) => (w.key === key ? { ...w, guardrail_requirement: label } : w)));
@@ -328,14 +359,9 @@ function Step2({
     setWeights(weights.filter((w) => w.key !== key));
   const addWeight = () =>
     setWeights([...weights, { key: `w${Date.now()}`, guardrail_requirement: "New bucket", weight: 0, rationale: "Custom weightage" }]);
-
-  const updateCritical = (id: string, patch: Partial<EditableCriticalReq>) =>
-    setCriticalReqs(criticalReqs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  const addCritical = () =>
-    setCriticalReqs([
-      ...criticalReqs,
-      { id: `cr${Date.now()}`, requirement: "New requirement", why_critical: "", impact: "", status: "pending" },
-    ]);
+  // Critical requirements UI removed per request; setCriticalReqs kept for future use.
+  void setCriticalReqs;
+  void approvedCriticals;
 
   return (
     <div className="mt-8 space-y-6">
@@ -346,62 +372,15 @@ function Step2({
         <Badge variant="secondary" className="gap-1"><Brain className="h-3 w-3" /> Step 2 of 4</Badge>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <StatusTile icon={<Target className="h-4 w-4" />} label="Guardrails approved"
           value={`${approvedGuardrails} / ${guardrails.length}`} tone="primary" />
-        <StatusTile icon={<Shield className="h-4 w-4" />} label="Requirements approved"
-          value={`${approvedCriticals} / ${criticalReqs.length}`} tone="success" />
         <StatusTile icon={<Clock className="h-4 w-4" />} label="Pending review"
           value={`${pendingReview}`} tone={pendingReview > 0 ? "warning" : "muted"} />
       </div>
 
       <SectionCard icon={<FileText className="h-4 w-4" />} title="Role Summary">
         <p className="text-sm leading-relaxed text-foreground/90">{analysis.role_summary}</p>
-      </SectionCard>
-
-      <SectionCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements"
-        action={<Button variant="outline" size="sm" onClick={addCritical} className="gap-2">
-          <Plus className="h-3.5 w-3.5" /> Add requirement
-        </Button>}>
-        <div className="space-y-3">
-          {criticalReqs.map((r) => (
-            <div key={r.id} className={`rounded-lg border bg-card p-3 ${
-              r.status === "approved" ? "border-[oklch(0.62_0.16_155/0.45)]" :
-              r.status === "rejected" ? "border-destructive/30 opacity-60" : "border-border"
-            }`}>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <Input
-                  value={r.requirement}
-                  onChange={(e) => updateCritical(r.id, { requirement: e.target.value })}
-                  className="h-8 flex-1 min-w-[200px] text-sm font-semibold"
-                  placeholder="Requirement"
-                />
-                <StatusPill status={r.status} />
-              </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <EditableFieldBlock tone="info" label="Why critical" value={r.why_critical}
-                  onChange={(v) => updateCritical(r.id, { why_critical: v })} />
-                <EditableFieldBlock tone="warning" label="Impact on decision" value={r.impact}
-                  onChange={(v) => updateCritical(r.id, { impact: v })} />
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <Button size="sm" variant={r.status === "approved" ? "default" : "outline"}
-                  onClick={() => updateCritical(r.id, { status: "approved" })} className="h-7 gap-1.5 text-xs">
-                  <ThumbsUp className="h-3.5 w-3.5" /> {r.status === "approved" ? "Approved" : "Approve"}
-                </Button>
-                <Button size="sm" variant={r.status === "rejected" ? "destructive" : "outline"}
-                  onClick={() => updateCritical(r.id, { status: "rejected" })} className="h-7 gap-1.5 text-xs">
-                  <ThumbsDown className="h-3.5 w-3.5" /> {r.status === "rejected" ? "Rejected" : "Reject"}
-                </Button>
-                <Button size="sm" variant="ghost"
-                  onClick={() => setCriticalReqs(criticalReqs.filter((x) => x.id !== r.id))}
-                  className="ml-auto h-7 w-7 p-0">
-                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
       </SectionCard>
 
       <SectionCard icon={<Target className="h-4 w-4" />} title="Suggested Guardrails"
