@@ -519,16 +519,6 @@ function Step2({
               ))}
             </ul>
           </div>
-          <div className="sm:col-span-2">
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approved Critical Requirements ({approvedCriticals})</div>
-            <ul className="space-y-1 text-sm">
-              {criticalReqs.filter((r) => r.status === "approved").map((r) => (
-                <li key={r.id} className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /> {r.requirement}
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </SectionCard>
 
