@@ -743,58 +743,24 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
     }
     return { matched: m, missing: miss };
   }, [kw, resume]);
-  const coverage = kw.length ? Math.round((matched.length / kw.length) * 100) : 0;
+  const matchedSet = useMemo(() => new Set(matched.map((k) => k.toLowerCase())), [matched]);
+  const missingSet = useMemo(() => new Set(missing.map((k) => k.toLowerCase())), [missing]);
 
   return (
     <div className="space-y-6">
       <DecisionHero result={result} />
 
-      <ReportCard icon={<Sparkles className="h-4 w-4" />} title="Resume Keyword Coverage" full>
-        <div className="mb-3 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground">{matched.length}</span> of{" "}
-            <span className="font-semibold text-foreground">{kw.length}</span> rubric keywords found in resume
-          </span>
-          <span className="font-mono text-xs font-semibold">{coverage}%</span>
-        </div>
-        <Progress value={coverage} className="h-2" />
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[oklch(0.4_0.16_155)]">
-              Found in resume ({matched.length})
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {matched.length === 0 && <span className="text-xs text-muted-foreground">None.</span>}
-              {matched.map((k, i) => (
-                <span key={i} className="rounded-full border border-[oklch(0.62_0.16_155/0.3)] bg-[oklch(0.62_0.16_155/0.12)] px-2 py-0.5 text-[11px] font-medium text-[oklch(0.4_0.16_155)]">
-                  {k}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-destructive">
-              Missing from resume ({missing.length})
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {missing.length === 0 && <span className="text-xs text-muted-foreground">None — full keyword coverage.</span>}
-              {missing.map((k, i) => (
-                <span key={i} className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive line-through decoration-destructive/50">
-                  {k}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          Highlighted terms appear with a blue badge wherever they show up in the evaluation text below.
-        </p>
-      </ReportCard>
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-card/60 px-4 py-2.5 text-[11px] text-muted-foreground">
+        <span className="font-semibold uppercase tracking-wide text-foreground/70">Keyword legend:</span>
+        <span className="rubric-kw rubric-kw--match">Found in resume</span>
+        <span className="rubric-kw rubric-kw--miss">Missing from resume</span>
+        <span className="ml-auto">{matched.length}/{kw.length} rubric keywords matched</span>
+      </div>
 
       <SectionGrid>
         <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary">
           <p className="text-sm leading-relaxed text-foreground/90">
-            <HL text={result.candidate_summary} keywords={kw} />
+            <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
           </p>
         </ReportCard>
 
@@ -808,8 +774,8 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
                   <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                 )}
                 <span>
-                  <span className="font-medium"><HL text={c.requirement} keywords={kw} /></span>
-                  {c.note && <span className="text-muted-foreground"> — <HL text={c.note} keywords={kw} /></span>}
+                  <span className="font-medium"><HL text={c.requirement} keywords={kw} matched={matchedSet} missing={missingSet} /></span>
+                  {c.note && <span className="text-muted-foreground"> — <HL text={c.note} keywords={kw} matched={matchedSet} missing={missingSet} /></span>}
                 </span>
               </li>
             ))}
@@ -819,12 +785,12 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
 
       <SectionGrid>
         <ReportCard icon={<Scale className="h-4 w-4" />} title="Key Insights">
-          <SubList title="Strengths" tone="success" items={result.strengths} kw={kw} />
-          <SubList title="Concerns" tone="warning" items={result.tradeoffs} kw={kw} />
+          <SubList title="Strengths" tone="success" items={result.strengths} kw={kw} matched={matchedSet} missing={missingSet} />
+          <SubList title="Concerns" tone="warning" items={result.tradeoffs} kw={kw} matched={matchedSet} missing={missingSet} />
         </ReportCard>
         <ReportCard icon={<AlertOctagon className="h-4 w-4" />} title="Risk Alerts & Missing Requirements">
-          <SubList title="Risk Alerts" tone="destructive" items={result.risk_alerts} kw={kw} />
-          <SubList title="Missing Requirements" tone="destructive" items={result.missing_requirements} kw={kw} />
+          <SubList title="Risk Alerts" tone="destructive" items={result.risk_alerts} kw={kw} matched={matchedSet} missing={missingSet} />
+          <SubList title="Missing Requirements" tone="destructive" items={result.missing_requirements} kw={kw} matched={matchedSet} missing={missingSet} />
         </ReportCard>
       </SectionGrid>
 
@@ -833,13 +799,13 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
           {(result.interview_questions || []).map((q, i) => (
             <details key={i} className="group rounded-lg border border-border/60 bg-card px-4 py-3 open:shadow-[var(--shadow-card)]">
               <summary className="flex cursor-pointer items-start justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
-                <div className="flex-1"><HL text={q.question} keywords={kw} /></div>
+                <div className="flex-1"><HL text={q.question} keywords={kw} matched={matchedSet} missing={missingSet} /></div>
                 <Badge variant="secondary" className="shrink-0 text-[10px]">{q.category}</Badge>
               </summary>
               <div className="mt-3 grid gap-3 text-xs text-muted-foreground sm:grid-cols-3">
-                <Field label="Why it matters" text={q.why_matters} kw={kw} />
-                <Field label="Strong answer" text={q.strong_answer} kw={kw} />
-                <Field label="Risk signal" text={q.risk_signal} kw={kw} />
+                <Field label="Why it matters" text={q.why_matters} kw={kw} matched={matchedSet} missing={missingSet} />
+                <Field label="Strong answer" text={q.strong_answer} kw={kw} matched={matchedSet} missing={missingSet} />
+                <Field label="Risk signal" text={q.risk_signal} kw={kw} matched={matchedSet} missing={missingSet} />
               </div>
             </details>
           ))}
@@ -847,7 +813,7 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
       </ReportCard>
 
       <ReportCard icon={<Target className="h-4 w-4" />} title="Guardrail Evaluation" full>
-        <GuardrailTable guardrails={result.guardrails} kw={kw} />
+        <GuardrailTable guardrails={result.guardrails} kw={kw} matched={matchedSet} missing={missingSet} />
       </ReportCard>
 
       <ReportCard icon={<Calculator className="h-4 w-4" />} title="Score Calculation" full>
@@ -856,9 +822,9 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
 
       <ReportCard icon={<Brain className="h-4 w-4" />} title="AI Self-Audit" full>
         <div className="grid gap-6 md:grid-cols-3">
-          <SubList title="Assumptions Made" tone="info" items={result.assumptions} kw={kw} dense />
-          <SubList title="Missing Information" tone="warning" items={result.missing_information} kw={kw} dense />
-          <SubList title="Verification Needed" tone="info" items={result.verification_needed} kw={kw} dense />
+          <SubList title="Assumptions Made" tone="info" items={result.assumptions} kw={kw} matched={matchedSet} missing={missingSet} dense />
+          <SubList title="Missing Information" tone="warning" items={result.missing_information} kw={kw} matched={matchedSet} missing={missingSet} dense />
+          <SubList title="Verification Needed" tone="info" items={result.verification_needed} kw={kw} matched={matchedSet} missing={missingSet} dense />
         </div>
       </ReportCard>
     </div>
