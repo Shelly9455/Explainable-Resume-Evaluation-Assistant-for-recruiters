@@ -82,7 +82,7 @@ async function callGroq(system: string, user: string) {
   // Groq free tier caps `llama-3.1-8b-instant` at 6000 TPM. Trim the user
   // payload so prompt + completion stay safely under that ceiling.
   // ~4 chars/token => 12000 chars ≈ 3000 tokens of user content.
-  const MAX_USER_CHARS = 12000;
+  const MAX_USER_CHARS = 6000;
   const trimmedUser =
     user.length > MAX_USER_CHARS
       ? user.slice(0, MAX_USER_CHARS) + "\n\n[TRUNCATED]"
@@ -94,7 +94,7 @@ async function callGroq(system: string, user: string) {
     body: JSON.stringify({
       model: "llama-3.1-8b-instant",
       temperature: 0.2,
-      max_tokens: 2000,
+      max_tokens: 1500,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
