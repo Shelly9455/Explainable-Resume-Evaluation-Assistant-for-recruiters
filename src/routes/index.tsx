@@ -358,7 +358,7 @@ function Step2({
   const deleteWeight = (key: WeightageBucket["key"]) =>
     setWeights(weights.filter((w) => w.key !== key));
   const addWeight = () =>
-    setWeights([...weights, { key: `w${Date.now()}`, guardrail_requirement: "New bucket", weight: 0, rationale: "Custom weightage" }]);
+    setWeights([{ key: `w${Date.now()}`, guardrail_requirement: "New bucket", weight: 0, rationale: "Custom weightage" }, ...weights]);
   // Critical requirements UI removed per request; setCriticalReqs kept for future use.
   void setCriticalReqs;
   void approvedCriticals;
