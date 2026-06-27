@@ -169,7 +169,7 @@ function Index() {
                 <RotateCcw className="h-4 w-4" /> New evaluation
               </Button>
             </div>
-            <Report result={result} />
+            <Report result={result} resume={resume} />
           </div>
         )}
       </main>
@@ -727,15 +727,69 @@ function EditableFieldBlock({ tone, label, value, onChange, placeholder }: {
 
 /* ============================ REPORT (STEP 4) ============================ */
 
-function Report({ result }: { result: EvaluationResult }) {
+function Report({ result, resume }: { result: EvaluationResult; resume: string }) {
   const kw = useMemo(
     () => (result.rubric_keywords || []).filter(Boolean).sort((a, b) => b.length - a.length),
     [result.rubric_keywords],
   );
+  const { matched, missing } = useMemo(() => {
+    const r = resume.toLowerCase();
+    const m: string[] = [], miss: string[] = [];
+    for (const k of kw) {
+      const t = k.trim().toLowerCase();
+      if (!t) continue;
+      const re = new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+      (re.test(r) ? m : miss).push(k);
+    }
+    return { matched: m, missing: miss };
+  }, [kw, resume]);
+  const coverage = kw.length ? Math.round((matched.length / kw.length) * 100) : 0;
 
   return (
     <div className="space-y-6">
       <DecisionHero result={result} />
+
+      <ReportCard icon={<Sparkles className="h-4 w-4" />} title="Resume Keyword Coverage" full>
+        <div className="mb-3 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            <span className="font-semibold text-foreground">{matched.length}</span> of{" "}
+            <span className="font-semibold text-foreground">{kw.length}</span> rubric keywords found in resume
+          </span>
+          <span className="font-mono text-xs font-semibold">{coverage}%</span>
+        </div>
+        <Progress value={coverage} className="h-2" />
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[oklch(0.4_0.16_155)]">
+              Found in resume ({matched.length})
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {matched.length === 0 && <span className="text-xs text-muted-foreground">None.</span>}
+              {matched.map((k, i) => (
+                <span key={i} className="rounded-full border border-[oklch(0.62_0.16_155/0.3)] bg-[oklch(0.62_0.16_155/0.12)] px-2 py-0.5 text-[11px] font-medium text-[oklch(0.4_0.16_155)]">
+                  {k}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-destructive">
+              Missing from resume ({missing.length})
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {missing.length === 0 && <span className="text-xs text-muted-foreground">None — full keyword coverage.</span>}
+              {missing.map((k, i) => (
+                <span key={i} className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive line-through decoration-destructive/50">
+                  {k}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          Highlighted terms appear with a blue badge wherever they show up in the evaluation text below.
+        </p>
+      </ReportCard>
 
       <SectionGrid>
         <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary">
@@ -774,41 +828,6 @@ function Report({ result }: { result: EvaluationResult }) {
         </ReportCard>
       </SectionGrid>
 
-      <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Recommended Screening Questions (Top 5)" full>
-        <ol className="space-y-3 text-sm">
-          {(result.top_5_questions || []).map((q, i) => (
-            <li key={i} className="rounded-lg border border-border/60 bg-card px-4 py-3">
-              <div className="flex gap-3">
-                <span className="font-mono text-xs text-primary">{String(i + 1).padStart(2, "0")}</span>
-                <div className="flex-1 space-y-1.5">
-                  <div className="font-medium"><HL text={q.question} keywords={kw} /></div>
-                  <div className="text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground/80">Why: </span>
-                    <HL text={q.why} keywords={kw} />
-                  </div>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </ReportCard>
-
-      <ReportCard icon={<Target className="h-4 w-4" />} title="Guardrail Evaluation" full>
-        <GuardrailTable guardrails={result.guardrails} kw={kw} />
-      </ReportCard>
-
-      <ReportCard icon={<Calculator className="h-4 w-4" />} title="Score Calculation" full>
-        <ScoreBreakdown result={result} />
-      </ReportCard>
-
-      <ReportCard icon={<Brain className="h-4 w-4" />} title="AI Self-Audit" full>
-        <div className="grid gap-6 md:grid-cols-3">
-          <SubList title="Assumptions Made" tone="info" items={result.assumptions} kw={kw} dense />
-          <SubList title="Missing Information" tone="warning" items={result.missing_information} kw={kw} dense />
-          <SubList title="Verification Needed" tone="info" items={result.verification_needed} kw={kw} dense />
-        </div>
-      </ReportCard>
-
       <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Deeper Interview Intelligence" full>
         <div className="space-y-3">
           {(result.interview_questions || []).map((q, i) => (
@@ -824,6 +843,22 @@ function Report({ result }: { result: EvaluationResult }) {
               </div>
             </details>
           ))}
+        </div>
+      </ReportCard>
+
+      <ReportCard icon={<Target className="h-4 w-4" />} title="Guardrail Evaluation" full>
+        <GuardrailTable guardrails={result.guardrails} kw={kw} />
+      </ReportCard>
+
+      <ReportCard icon={<Calculator className="h-4 w-4" />} title="Score Calculation" full>
+        <ScoreBreakdown result={result} />
+      </ReportCard>
+
+      <ReportCard icon={<Brain className="h-4 w-4" />} title="AI Self-Audit" full>
+        <div className="grid gap-6 md:grid-cols-3">
+          <SubList title="Assumptions Made" tone="info" items={result.assumptions} kw={kw} dense />
+          <SubList title="Missing Information" tone="warning" items={result.missing_information} kw={kw} dense />
+          <SubList title="Verification Needed" tone="info" items={result.verification_needed} kw={kw} dense />
         </div>
       </ReportCard>
     </div>
