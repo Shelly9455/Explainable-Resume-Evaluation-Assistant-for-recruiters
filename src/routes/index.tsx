@@ -750,37 +750,11 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
     <div className="space-y-6">
       <DecisionHero result={result} />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-card/60 px-4 py-2.5 text-[11px] text-muted-foreground">
-        <span className="font-semibold uppercase tracking-wide text-foreground/70">Keyword legend:</span>
-        <span className="rubric-kw">Important rubric keyword</span>
-        <span className="ml-auto">{matched.length}/{kw.length} rubric keywords matched</span>
-      </div>
-
-      <SectionGrid>
-        <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary">
-          <p className="text-sm leading-relaxed text-foreground/90">
-            <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
-          </p>
-        </ReportCard>
-
-        <ReportCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements">
-          <ul className="space-y-2 text-sm">
-            {result.critical_requirements?.map((c, i) => (
-              <li key={i} className="flex items-start gap-2">
-                {c.met ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "oklch(0.62 0.16 155)" }} />
-                ) : (
-                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                )}
-                <span>
-                  <span className="font-medium"><HL text={c.requirement} keywords={kw} matched={matchedSet} missing={missingSet} /></span>
-                  {c.note && <span className="text-muted-foreground"> — <HL text={c.note} keywords={kw} matched={matchedSet} missing={missingSet} /></span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </ReportCard>
-      </SectionGrid>
+      <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary" full>
+        <p className="text-sm leading-relaxed text-foreground/90">
+          <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
+        </p>
+      </ReportCard>
 
       <SectionGrid>
         <ReportCard icon={<Scale className="h-4 w-4" />} title="Key Insights">
@@ -907,7 +881,7 @@ function GuardrailTable({ guardrails, kw, matched, missing }: { guardrails: Guar
         <tbody>
           {guardrails?.map((g, i) => (
             <tr key={i} className="border-b border-border/40 align-top last:border-0">
-              <td className="px-3 py-3 font-medium"><HL text={g.requirement} keywords={kw} matched={matched} missing={missing} /></td>
+              <td className="px-3 py-3 font-medium">{g.requirement}</td>
               <td className="px-3 py-3 text-muted-foreground">{g.weight}%</td>
               <td className="px-3 py-3"><MatchBadge status={g.match_status} /></td>
               <td className="px-3 py-3">
