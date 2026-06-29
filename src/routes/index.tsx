@@ -752,8 +752,7 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-card/60 px-4 py-2.5 text-[11px] text-muted-foreground">
         <span className="font-semibold uppercase tracking-wide text-foreground/70">Keyword legend:</span>
-        <span className="rubric-kw rubric-kw--match">Found in resume</span>
-        <span className="rubric-kw rubric-kw--miss">Missing from resume</span>
+        <span className="rubric-kw">Important rubric keyword</span>
         <span className="ml-auto">{matched.length}/{kw.length} rubric keywords matched</span>
       </div>
 
