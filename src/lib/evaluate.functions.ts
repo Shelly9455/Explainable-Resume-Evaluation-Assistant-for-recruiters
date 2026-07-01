@@ -102,6 +102,9 @@ function toFriendlyGroqError(status: number, text: string) {
   if (status === 413) {
     return "The JD or resume is too large for the current AI token limit. Please shorten the pasted text or upload a smaller document.";
   }
+  if (status === 400 && text.includes("json_validate_failed")) {
+    return "The AI response was cut off before the evaluation JSON could finish. Please try again with fewer approved guardrails or a shorter resume.";
+  }
   return `AI provider error ${status}: ${text.slice(0, 240)}`;
 }
 
@@ -132,8 +135,12 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
     });
 
     if (res.ok) {
-      const payload = (await res.json()) as { choices: { message: { content: string } }[] };
-      const raw = payload.choices?.[0]?.message?.content ?? "";
+      const payload = (await res.json()) as { choices: { finish_reason?: string; message: { content: string } }[] };
+      const choice = payload.choices?.[0];
+      if (choice?.finish_reason === "length") {
+        throw new Error("The AI response was cut off before the evaluation could finish. Please try again with fewer approved guardrails or a shorter resume.");
+      }
+      const raw = choice?.message?.content ?? "";
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("Model did not return JSON.");
       return JSON.parse(jsonMatch[0]);
@@ -205,41 +212,86 @@ export const analyzeJD = createServerFn({ method: "POST" })
 
 /* ============================== EVALUATE RESUME ============================== */
 
-const EVAL_SYSTEM = `You are an Explainable Resume Evaluation Assistant. The recruiter has LOCKED a hiring rubric (guardrails, weightage buckets, critical requirements). You MUST use this exact rubric — do not invent new guardrails and do not change weightages.
+const EVAL_SYSTEM = `Evaluate a resume against recruiter-locked guardrails using only resume evidence. Never infer missing facts.
 
-Keep the JSON compact. Use short phrases and one-sentence explanations. Evidence arrays must contain only exact or near-exact resume snippets. Do not include markdown.
-
-Process:
-1. Evaluate the resume against EACH locked guardrail using ONLY evidence explicitly present in the resume. Never infer missing experience.
-2. Map each guardrail to one of the 5 weightage buckets (skills_match, experience_match, domain_relevance, critical_requirements, risk_factors) and distribute that bucket's weight across guardrails mapped to it. The "weight" you report per guardrail must equal its share of its bucket weight; the sum of ALL guardrail weights must equal 100.
-3. Score each guardrail: Strong Match=100%, Partial Match=60%, Weak Match=30%, No Evidence=0% of its weight. contribution = weight * factor.
-4. match_score = sum of contributions, rounded to nearest integer.
-5. Decision: >=80 Strong Proceed, 70-79 Proceed with Review, 50-69 Manual Review Required, <50 Unlikely Fit. Missing any critical requirement => Unlikely Fit regardless of score. Ambiguous evidence => Manual Review Required.
-6. Set top_5_questions to an empty array.
-7. Generate exactly 5 deeper interview questions across the most relevant categories.
-8. In score_calculation, explain CLEARLY how the recruiter-locked guardrails and weightages produced the final decision.
-
-Return STRICT JSON ONLY, no markdown:
+Return compact STRICT JSON ONLY with these short keys:
 {
-  "decision": "Strong Proceed"|"Proceed with Review"|"Manual Review Required"|"Unlikely Fit",
-  "match_score": number,
-  "confidence": "High"|"Medium"|"Low",
-  "description": string,
-  "candidate_summary": string,
-  "guardrails": [{ "requirement": string, "weight": number, "match_status": "Strong Match"|"Partial Match"|"Weak Match"|"No Evidence", "contribution": number, "explanation": string[], "evidence": string[] }],
-  "critical_requirements": [{ "requirement": string, "met": boolean, "note": string }],
-  "score_calculation": string,
-  "strengths": string[],
-  "missing_requirements": string[],
-  "tradeoffs": string[],
-  "risk_alerts": string[],
-  "assumptions": string[],
-  "missing_information": string[],
-  "verification_needed": string[],
-  "interview_questions": [{ "question": string, "category": string, "why_matters": string, "strong_answer": string, "risk_signal": string }],
-  "top_5_questions": [{ "question": string, "why": string }],
-  "rubric_keywords": string[]
-}`;
+ "d":"Strong Proceed|Proceed with Review|Manual Review Required|Unlikely Fit",
+ "s":0-100,
+ "c":"High|Medium|Low",
+ "desc":"one short sentence",
+ "sum":"one short candidate summary sentence",
+ "g":[{"r":"guardrail name","w":number,"st":"Strong Match|Partial Match|Weak Match|No Evidence","con":number,"ex":"one short reason","ev":"short resume quote or No direct evidence"}],
+ "calc":"one sentence explaining how locked weights affected decision",
+ "str":["max 3 short strengths"],
+ "miss":["max 3 missing requirements"],
+ "risk":["max 3 risks"],
+ "gap":["max 3 missing info items"],
+ "verify":["max 3 verification items"],
+ "q":[{"q":"question","cat":"category","why":"why it matters","strong":"strong answer signal","risk":"risk signal"}],
+ "kw":["max 12 important rubric keywords"]
+}
+
+Rules:
+- Include one g item for each locked guardrail, in the same order.
+- Guardrail weights must sum to 100. contribution = weight * status factor (Strong 1, Partial .6, Weak .3, No Evidence 0).
+- Decision: >=80 Strong Proceed, 70-79 Proceed with Review, 50-69 Manual Review Required, <50 Unlikely Fit. Missing a critical requirement means Unlikely Fit.
+- Generate exactly 5 q items.
+- Keep every string under 120 characters.`;
+
+type CompactEvaluationResult = {
+  d?: EvaluationResult["decision"];
+  s?: number;
+  c?: EvaluationResult["confidence"];
+  desc?: string;
+  sum?: string;
+  g?: { r?: string; w?: number; st?: GuardrailEval["match_status"]; con?: number; ex?: string; ev?: string }[];
+  calc?: string;
+  str?: string[];
+  miss?: string[];
+  risk?: string[];
+  gap?: string[];
+  verify?: string[];
+  q?: { q?: string; cat?: string; why?: string; strong?: string; risk?: string }[];
+  kw?: string[];
+};
+
+function normalizeEvaluation(out: CompactEvaluationResult): EvaluationResult {
+  const guardrails = (out.g ?? []).map((g): GuardrailEval => ({
+    requirement: g.r || "Guardrail requirement",
+    weight: Number(g.w ?? 0),
+    match_status: g.st || "No Evidence",
+    contribution: Number(g.con ?? 0),
+    explanation: g.ex ? [g.ex] : [],
+    evidence: g.ev ? [g.ev] : [],
+  }));
+  return {
+    decision: out.d || "Manual Review Required",
+    match_score: Math.max(0, Math.min(100, Math.round(Number(out.s ?? 0)))),
+    confidence: out.c || "Medium",
+    description: out.desc || "Evaluation completed using the locked recruiter rubric.",
+    candidate_summary: out.sum || "Candidate evaluated against the approved guardrails and weightages.",
+    guardrails,
+    critical_requirements: [],
+    score_calculation: out.calc || "Final score is based on each approved guardrail's locked weight and evidence strength.",
+    strengths: out.str ?? [],
+    missing_requirements: out.miss ?? [],
+    tradeoffs: [],
+    risk_alerts: out.risk ?? [],
+    assumptions: [],
+    missing_information: out.gap ?? [],
+    verification_needed: out.verify ?? [],
+    interview_questions: (out.q ?? []).map((q) => ({
+      question: q.q || "Validate the candidate's relevant experience.",
+      category: q.cat || "Validation",
+      why_matters: q.why || "This confirms decision-critical evidence.",
+      strong_answer: q.strong || "Provides specific, measurable examples.",
+      risk_signal: q.risk || "Cannot provide concrete evidence.",
+    })),
+    top_5_questions: [],
+    rubric_keywords: out.kw ?? [],
+  };
+}
 
 export const evaluateResume = createServerFn({ method: "POST" })
   .inputValidator((data: { jd: string; resume: string; criteria: LockedCriteria }) => {
@@ -251,7 +303,7 @@ export const evaluateResume = createServerFn({ method: "POST" })
     const compactCriteria = {
       guardrails: data.criteria.guardrails.map((g) => ({
         name: truncateText(g.name, 80),
-        explanation: truncateText(g.explanation, 180),
+        explanation: truncateText(g.explanation, 120),
         importance: g.importance,
       })),
       weightages: data.criteria.weightages.map((w) => ({
@@ -260,7 +312,7 @@ export const evaluateResume = createServerFn({ method: "POST" })
       })),
       critical_requirements: data.criteria.critical_requirements.map((r) => truncateText(r, 120)),
     };
-    const user = `JD:\n${truncateText(data.jd, 900)}\n\nLOCKED_CRITERIA_JSON:\n${JSON.stringify(compactCriteria)}\n\nRESUME:\n${truncateText(data.resume, 2600)}\n\nReturn only the JSON object.`;
-    const out = await callGroq(EVAL_SYSTEM, user, { maxTokens: 1900, maxUserChars: 5200, retries: 1 });
-    return out as EvaluationResult;
+    const user = `JD:\n${truncateText(data.jd, 650)}\n\nLOCKED_CRITERIA_JSON:\n${JSON.stringify(compactCriteria)}\n\nRESUME:\n${truncateText(data.resume, 2200)}\n\nReturn compact JSON now.`;
+    const out = await callGroq(EVAL_SYSTEM, user, { maxTokens: 2400, maxUserChars: 4600, retries: 1 });
+    return normalizeEvaluation(out as CompactEvaluationResult);
   });
