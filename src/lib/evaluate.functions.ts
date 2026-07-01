@@ -313,32 +313,25 @@ export const analyzeJD = createServerFn({ method: "POST" })
 
 /* ============================== EVALUATE RESUME ============================== */
 
-const EVAL_SYSTEM = `Evaluate a resume against recruiter-locked guardrails using only resume evidence. Never infer missing facts.
+const EVAL_SYSTEM = `Evaluate ONE recruiter-weighted requirement against ONLY the resume evidence provided. Never infer missing facts.
 
-Return compact STRICT JSON ONLY with these short keys:
+Return compact STRICT JSON ONLY:
 {
- "d":"Strong Proceed|Proceed with Review|Manual Review Required|Unlikely Fit",
- "s":0-100,
- "c":"High|Medium|Low",
- "desc":"one short sentence",
- "sum":"one short candidate summary sentence",
- "g":[{"r":"guardrail name","w":number,"st":"Strong Match|Partial Match|Weak Match|No Evidence","con":number,"ex":"one short reason","ev":"short resume quote or No direct evidence"}],
- "calc":"one sentence explaining how locked weights affected decision",
- "str":["max 3 short strengths"],
- "miss":["max 3 missing requirements"],
- "risk":["max 3 risks"],
- "gap":["max 3 missing info items"],
- "verify":["max 3 verification items"],
- "q":[{"q":"question","cat":"category","why":"why it matters","strong":"strong answer signal","risk":"risk signal"}],
- "kw":["max 12 important rubric keywords"]
+ "st":"Strong Match|Partial Match|Weak Match|No Evidence",
+ "ex":"one short reason tied to evidence and requirement weight",
+ "ev":"one short resume quote or No direct evidence",
+ "str":["max 2 short strengths"],
+ "miss":["max 2 missing items"],
+ "risk":["max 2 risks"],
+ "gap":["max 2 missing info items"],
+ "verify":["max 2 verification items"],
+ "kw":["max 6 important requirement keywords"]
 }
 
 Rules:
-- Include one g item for each locked guardrail, in the same order.
-- Guardrail weights must sum to 100. contribution = weight * status factor (Strong 1, Partial .6, Weak .3, No Evidence 0).
-- Decision: >=80 Strong Proceed, 70-79 Proceed with Review, 50-69 Manual Review Required, <50 Unlikely Fit. Missing a critical requirement means Unlikely Fit.
-- Generate exactly 5 q items.
-- Keep every string under 120 characters.`;
+- Keep every string under 110 characters.
+- If evidence is indirect, use Partial Match or Weak Match.
+- If the evidence slice does not prove the requirement, use No Evidence.`;
 
 type CompactEvaluationResult = {
   d?: EvaluationResult["decision"];
@@ -354,6 +347,18 @@ type CompactEvaluationResult = {
   gap?: string[];
   verify?: string[];
   q?: { q?: string; cat?: string; why?: string; strong?: string; risk?: string }[];
+  kw?: string[];
+};
+
+type CompactGuardrailResult = {
+  st?: GuardrailEval["match_status"];
+  ex?: string;
+  ev?: string;
+  str?: string[];
+  miss?: string[];
+  risk?: string[];
+  gap?: string[];
+  verify?: string[];
   kw?: string[];
 };
 
@@ -394,6 +399,189 @@ function normalizeEvaluation(out: CompactEvaluationResult): EvaluationResult {
   };
 }
 
+function normalizeWeights(items: EvaluationItem[]) {
+  const total = items.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
+  if (!items.length) return items;
+  if (total <= 0) {
+    const equal = Math.floor(100 / items.length);
+    let remainder = 100 - equal * items.length;
+    return items.map((item) => ({ ...item, weight: equal + (remainder-- > 0 ? 1 : 0) }));
+  }
+
+  const normalized = items.map((item) => ({ ...item, weight: Math.round((Number(item.weight) / total) * 100) }));
+  const drift = 100 - normalized.reduce((sum, item) => sum + item.weight, 0);
+  const largestIndex = normalized.reduce((best, item, index) => item.weight > normalized[best].weight ? index : best, 0);
+  normalized[largestIndex] = { ...normalized[largestIndex], weight: normalized[largestIndex].weight + drift };
+  return normalized;
+}
+
+function overlapScore(a: string, b: string) {
+  const bTokens = new Set(tokenize(b));
+  return tokenize(a).reduce((score, token) => score + (bTokens.has(token) ? 1 : 0), 0);
+}
+
+function buildEvaluationItems(criteria: LockedCriteria): EvaluationItem[] {
+  const guardrails = criteria.guardrails ?? [];
+  const weightages = criteria.weightages ?? [];
+
+  if (weightages.length) {
+    const items = weightages.map((weightage, index) => {
+      const match = guardrails
+        .map((guardrail) => ({ guardrail, score: overlapScore(weightage.label, `${guardrail.name} ${guardrail.explanation}`) }))
+        .sort((a, b) => b.score - a.score)[0]?.guardrail;
+
+      return {
+        id: `w${index + 1}`,
+        label: weightage.label || match?.name || `Weighted requirement ${index + 1}`,
+        explanation: match?.explanation || weightage.label || "Recruiter-approved weighted hiring requirement.",
+        importance: match?.importance || (weightage.weight >= 20 ? "High" : weightage.weight >= 10 ? "Medium" : "Low"),
+        weight: Number(weightage.weight) || 0,
+        weightageInfluence: `${Number(weightage.weight) || 0}% of the final score is assigned to this recruiter-configured requirement.`,
+      } satisfies EvaluationItem;
+    });
+    return normalizeWeights(items);
+  }
+
+  const items = guardrails.map((guardrail, index) => ({
+    id: `g${index + 1}`,
+    label: guardrail.name || `Guardrail ${index + 1}`,
+    explanation: guardrail.explanation || "Recruiter-approved guardrail.",
+    importance: guardrail.importance,
+    weight: 0,
+    weightageInfluence: "No custom weight was provided; the app distributed influence evenly.",
+  } satisfies EvaluationItem));
+  return normalizeWeights(items);
+}
+
+function safeStatus(value?: string): GuardrailEval["match_status"] {
+  if (value === "Strong Match" || value === "Partial Match" || value === "Weak Match" || value === "No Evidence") return value;
+  return "No Evidence";
+}
+
+function fallbackGuardrailEvaluation(item: EvaluationItem, resume: string): CompactGuardrailResult {
+  const keywords = keywordPhrases(`${item.label} ${item.explanation}`, 8);
+  const hits = keywords.filter((keyword) => countKeywordHits(resume, [keyword]) > 0);
+  const ratio = keywords.length ? hits.length / keywords.length : 0;
+  const st: GuardrailEval["match_status"] = ratio >= 0.45
+    ? "Partial Match"
+    : ratio >= 0.22
+      ? "Weak Match"
+      : "No Evidence";
+
+  return {
+    st,
+    ex: hits.length
+      ? `${item.weightageInfluence} Found keyword evidence for ${hits.slice(0, 3).join(", ")}.`
+      : `${item.weightageInfluence} No direct keyword evidence was found in the resume text.`,
+    ev: hits.length ? `Keyword evidence: ${hits.slice(0, 4).join(", ")}` : "No direct evidence",
+    str: hits.length ? [`Evidence mentions ${hits.slice(0, 2).join(" and ")}.`] : [],
+    miss: st === "No Evidence" ? [`No evidence for ${item.label}.`] : [],
+    risk: item.importance === "High" && st !== "Strong Match" ? [`High-weight gap may reduce fit for ${item.label}.`] : [],
+    gap: st !== "Strong Match" ? [`More proof needed for ${item.label}.`] : [],
+    verify: [`Verify ${item.label} with concrete examples.`],
+    kw: keywords,
+  };
+}
+
+async function evaluateOneItem(item: EvaluationItem, resume: string): Promise<CompactGuardrailResult> {
+  const context = relevantResumeContext(resume, `${item.label} ${item.explanation}`, 1050);
+  const user = `REQUIREMENT_JSON:${JSON.stringify({
+    requirement: item.label,
+    weight: item.weight,
+    importance: item.importance,
+    influence: item.weightageInfluence,
+    definition: compactSentence(item.explanation, 180),
+  })}\n\nRESUME_EVIDENCE:\n${context || "No matching resume section found."}\n\nReturn JSON now.`;
+
+  try {
+    return await callGroq(EVAL_SYSTEM, user, { maxTokens: 520, maxUserChars: 1750, retries: 1 }) as CompactGuardrailResult;
+  } catch {
+    return fallbackGuardrailEvaluation(item, resume);
+  }
+}
+
+function buildDecision(score: number): EvaluationResult["decision"] {
+  if (score >= 80) return "Strong Proceed";
+  if (score >= 70) return "Proceed with Review";
+  if (score >= 50) return "Manual Review Required";
+  return "Unlikely Fit";
+}
+
+function uniqueLimited(items: string[], limit: number) {
+  return Array.from(new Set(items.map((item) => compactSentence(item, 150)).filter(Boolean))).slice(0, limit);
+}
+
+function buildInterviewQuestions(guardrails: GuardrailEval[]) {
+  const priority = [...guardrails].sort((a, b) => {
+    const statusGap = STATUS_FACTOR[a.match_status] - STATUS_FACTOR[b.match_status];
+    return statusGap || b.weight - a.weight;
+  });
+
+  return priority.slice(0, 5).map((guardrail) => ({
+    question: `Walk me through your most relevant example for ${guardrail.requirement}.`,
+    category: guardrail.match_status === "Strong Match" ? "Depth validation" : "Evidence gap",
+    why_matters: `${guardrail.weight}% of the score depends on this requirement.`,
+    strong_answer: "Gives a specific example with scope, actions, outcomes, and metrics.",
+    risk_signal: "Gives generic claims without concrete evidence or measurable results.",
+  }));
+}
+
+function assembleEvaluation(items: EvaluationItem[], parts: CompactGuardrailResult[]): EvaluationResult {
+  const guardrails = items.map((item, index): GuardrailEval => {
+    const part = parts[index] ?? fallbackGuardrailEvaluation(item, "");
+    const matchStatus = safeStatus(part.st);
+    const contribution = Number((item.weight * STATUS_FACTOR[matchStatus]).toFixed(1));
+    return {
+      requirement: item.label,
+      weight: item.weight,
+      match_status: matchStatus,
+      contribution,
+      explanation: [compactSentence(part.ex || `${item.weightageInfluence} Evidence was evaluated against this guardrail.`, 180)],
+      evidence: [compactSentence(part.ev || "No direct evidence", 180)],
+    };
+  });
+
+  const score = Math.max(0, Math.min(100, Number(guardrails.reduce((sum, g) => sum + g.contribution, 0).toFixed(1))));
+  const decision = buildDecision(score);
+  const highWeightGaps = guardrails.filter((g) => g.weight >= 15 && g.match_status !== "Strong Match");
+  const strongMatches = guardrails.filter((g) => g.match_status === "Strong Match");
+  const partialMatches = guardrails.filter((g) => g.match_status === "Partial Match");
+
+  return {
+    decision,
+    match_score: Math.round(score),
+    confidence: guardrails.some((g) => g.match_status === "No Evidence") ? "Medium" : "High",
+    description: `Decision reflects ${guardrails.length} recruiter-approved weighted requirements totaling 100%.`,
+    candidate_summary: `${decision}: ${score.toFixed(1)} points from recruiter-configured guardrails and weightages.`,
+    guardrails,
+    critical_requirements: [],
+    score_calculation: `Each guardrail's contribution equals recruiter weight × evidence strength; ${highWeightGaps.length ? `${highWeightGaps[0].requirement} was the largest gap.` : "no high-weight guardrail had a major gap."}`,
+    strengths: uniqueLimited([
+      ...parts.flatMap((part) => part.str ?? []),
+      ...strongMatches.map((g) => `${g.requirement} contributed the full ${g.weight} points.`),
+      ...partialMatches.map((g) => `${g.requirement} contributed ${g.contribution} of ${g.weight} possible points.`),
+    ], 4),
+    missing_requirements: uniqueLimited([
+      ...parts.flatMap((part) => part.miss ?? []),
+      ...guardrails.filter((g) => g.match_status === "No Evidence").map((g) => `${g.requirement} had no direct resume evidence.`),
+    ], 4),
+    tradeoffs: [],
+    risk_alerts: uniqueLimited([
+      ...parts.flatMap((part) => part.risk ?? []),
+      ...highWeightGaps.map((g) => `${g.requirement} carries ${g.weight}% weight but scored ${g.contribution} points.`),
+    ], 4),
+    assumptions: [],
+    missing_information: uniqueLimited(parts.flatMap((part) => part.gap ?? []), 4),
+    verification_needed: uniqueLimited(parts.flatMap((part) => part.verify ?? []), 4),
+    interview_questions: buildInterviewQuestions(guardrails),
+    top_5_questions: [],
+    rubric_keywords: uniqueLimited([
+      ...items.flatMap((item) => keywordPhrases(`${item.label} ${item.explanation}`, 6)),
+      ...parts.flatMap((part) => part.kw ?? []),
+    ], 24),
+  };
+}
+
 export const evaluateResume = createServerFn({ method: "POST" })
   .inputValidator((data: { jd: string; resume: string; criteria: LockedCriteria }) => {
     if (!data?.jd?.trim() || !data?.resume?.trim()) throw new Error("Job Description and Resume are required.");
@@ -401,19 +589,12 @@ export const evaluateResume = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data }): Promise<EvaluationResult> => {
-    const compactCriteria = {
-      guardrails: data.criteria.guardrails.map((g) => ({
-        name: truncateText(g.name, 80),
-        explanation: truncateText(g.explanation, 120),
-        importance: g.importance,
-      })),
-      weightages: data.criteria.weightages.map((w) => ({
-        label: truncateText(w.label, 90),
-        weight: w.weight,
-      })),
-      critical_requirements: data.criteria.critical_requirements.map((r) => truncateText(r, 120)),
-    };
-    const user = `JD:\n${truncateText(data.jd, 650)}\n\nLOCKED_CRITERIA_JSON:\n${JSON.stringify(compactCriteria)}\n\nRESUME:\n${truncateText(data.resume, 2200)}\n\nReturn compact JSON now.`;
-    const out = await callGroq(EVAL_SYSTEM, user, { maxTokens: 2400, maxUserChars: 4600, retries: 1 });
-    return normalizeEvaluation(out as CompactEvaluationResult);
+    const items = buildEvaluationItems(data.criteria);
+    const parts: CompactGuardrailResult[] = [];
+
+    for (const item of items) {
+      parts.push(await evaluateOneItem(item, data.resume));
+    }
+
+    return assembleEvaluation(items, parts);
   });
