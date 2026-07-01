@@ -81,6 +81,30 @@ type GroqCallOptions = {
   retries?: number;
 };
 
+type EvaluationItem = {
+  id: string;
+  label: string;
+  explanation: string;
+  importance: "High" | "Medium" | "Low";
+  weight: number;
+  weightageInfluence: string;
+};
+
+const STATUS_FACTOR: Record<GuardrailEval["match_status"], number> = {
+  "Strong Match": 1,
+  "Partial Match": 0.6,
+  "Weak Match": 0.3,
+  "No Evidence": 0,
+};
+
+const STOP_WORDS = new Set([
+  "about", "above", "after", "again", "against", "all", "also", "and", "any", "are", "because", "been", "being",
+  "between", "both", "business", "can", "candidate", "client", "company", "could", "demonstrated", "direct",
+  "each", "either", "experience", "from", "have", "having", "into", "more", "must", "need", "needs", "not", "only",
+  "other", "part", "role", "should", "skills", "than", "that", "the", "their", "then", "there", "these", "this",
+  "through", "under", "using", "with", "within", "work", "years", "your",
+]);
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function truncateText(text: string, maxChars: number) {
@@ -88,6 +112,83 @@ function truncateText(text: string, maxChars: number) {
   const head = Math.floor(maxChars * 0.7);
   const tail = maxChars - head;
   return `${text.slice(0, head)}\n\n[CONTENT TRUNCATED TO FIT PROVIDER TOKEN LIMIT]\n\n${text.slice(-tail)}`;
+}
+
+function compactSentence(text: string, maxChars = 140) {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= maxChars) return cleaned;
+  return `${cleaned.slice(0, Math.max(0, maxChars - 1)).trim()}…`;
+}
+
+function tokenize(text: string) {
+  return Array.from(new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9+#.\s-]/g, " ")
+      .split(/\s+/)
+      .map((t) => t.replace(/^-+|-+$/g, ""))
+      .filter((t) => t.length > 2 && !STOP_WORDS.has(t) && !/^\d+$/.test(t)),
+  ));
+}
+
+function keywordPhrases(text: string, max = 10) {
+  const cleaned = text.replace(/[()]/g, " ").replace(/\s+/g, " ").trim();
+  const chunks = cleaned
+    .split(/[,;|/\n]|\s+-\s+/)
+    .map((chunk) => chunk.trim())
+    .filter((chunk) => chunk.length >= 4 && chunk.length <= 56);
+  const tokens = tokenize(cleaned).slice(0, max);
+  return Array.from(new Set([...chunks, ...tokens])).slice(0, max);
+}
+
+function countKeywordHits(text: string, keywords: string[]) {
+  const lower = text.toLowerCase();
+  return keywords.reduce((count, keyword) => {
+    const escaped = keyword.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return count + (new RegExp(`\\b${escaped}\\b`, "i").test(lower) ? 1 : 0);
+  }, 0);
+}
+
+function splitResumeSegments(resume: string) {
+  const paragraphs = resume
+    .split(/\n{2,}|(?<=\.)\s+(?=[A-Z])/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (paragraphs.length) return paragraphs;
+  return resume
+    .split(/\n+/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function relevantResumeContext(resume: string, query: string, maxChars = 1800) {
+  const keywords = tokenize(query);
+  const segments = splitResumeSegments(resume);
+  const ranked = segments
+    .map((segment, index) => ({ segment, index, score: countKeywordHits(segment, keywords) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const selected: string[] = [];
+  let used = 0;
+  const add = (segment: string) => {
+    const clipped = compactSentence(segment, 420);
+    if (used + clipped.length + 2 > maxChars) return false;
+    selected.push(clipped);
+    used += clipped.length + 2;
+    return true;
+  };
+
+  for (const item of ranked.slice(0, 8)) add(item.segment);
+
+  if (!selected.length) {
+    add(resume.slice(0, 700));
+    if (resume.length > 1400) add(resume.slice(Math.floor(resume.length / 2), Math.floor(resume.length / 2) + 500));
+    if (resume.length > 900) add(resume.slice(-500));
+  }
+
+  return selected.join("\n");
 }
 
 function retrySecondsFromGroqError(text: string) {
@@ -100,10 +201,10 @@ function toFriendlyGroqError(status: number, text: string) {
     return "The AI provider is temporarily rate-limiting this workspace. I reduced the request size and retried, but it is still over the current token-per-minute limit. Please wait about 30 seconds and try again.";
   }
   if (status === 413) {
-    return "The JD or resume is too large for the current AI token limit. Please shorten the pasted text or upload a smaller document.";
+    return "The AI provider rejected this request size. The app will automatically evaluate smaller evidence slices instead of requiring a shorter resume.";
   }
   if (status === 400 && text.includes("json_validate_failed")) {
-    return "The AI response was cut off before the evaluation JSON could finish. Please try again with fewer approved guardrails or a shorter resume.";
+    return "The AI provider cut off a JSON response. The app will continue using smaller evidence-based evaluation batches.";
   }
   return `AI provider error ${status}: ${text.slice(0, 240)}`;
 }
@@ -138,7 +239,7 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
       const payload = (await res.json()) as { choices: { finish_reason?: string; message: { content: string } }[] };
       const choice = payload.choices?.[0];
       if (choice?.finish_reason === "length") {
-        throw new Error("The AI response was cut off before the evaluation could finish. Please try again with fewer approved guardrails or a shorter resume.");
+        throw new Error("The AI response was cut off before the evaluation JSON could finish.");
       }
       const raw = choice?.message?.content ?? "";
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
