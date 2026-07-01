@@ -75,43 +75,84 @@ export interface EvaluationResult {
 
 /* ============================== GROQ ============================== */
 
-async function callGroq(system: string, user: string) {
+type GroqCallOptions = {
+  maxTokens: number;
+  maxUserChars: number;
+  retries?: number;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function truncateText(text: string, maxChars: number) {
+  if (text.length <= maxChars) return text;
+  const head = Math.floor(maxChars * 0.7);
+  const tail = maxChars - head;
+  return `${text.slice(0, head)}\n\n[CONTENT TRUNCATED TO FIT PROVIDER TOKEN LIMIT]\n\n${text.slice(-tail)}`;
+}
+
+function retrySecondsFromGroqError(text: string) {
+  const match = text.match(/try again in\s+([\d.]+)s/i);
+  return match ? Math.ceil(Number(match[1])) : null;
+}
+
+function toFriendlyGroqError(status: number, text: string) {
+  if (status === 429) {
+    return "The AI provider is temporarily rate-limiting this workspace. I reduced the request size and retried, but it is still over the current token-per-minute limit. Please wait about 30 seconds and try again.";
+  }
+  if (status === 413) {
+    return "The JD or resume is too large for the current AI token limit. Please shorten the pasted text or upload a smaller document.";
+  }
+  return `AI provider error ${status}: ${text.slice(0, 240)}`;
+}
+
+async function callGroq(system: string, user: string, options: GroqCallOptions) {
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) throw new Error("GROQ_API_KEY is not configured.");
 
-  // Groq free tier caps `llama-3.1-8b-instant` at 6000 TPM. Trim the user
-  // payload so prompt + completion stay safely under that ceiling.
-  // ~4 chars/token => 12000 chars ≈ 3000 tokens of user content.
-  const MAX_USER_CHARS = 3500;
   const trimmedUser =
-    user.length > MAX_USER_CHARS
-      ? user.slice(0, MAX_USER_CHARS) + "\n\n[TRUNCATED]"
+    user.length > options.maxUserChars
+      ? truncateText(user, options.maxUserChars)
       : user;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
-    body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
-      temperature: 0.2,
-      max_tokens: 3500,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: trimmedUser },
-      ],
-    }),
-  });
+  const retries = options.retries ?? 1;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        temperature: 0.1,
+        max_tokens: options.maxTokens,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: trimmedUser },
+        ],
+      }),
+    });
 
-  if (!res.ok) {
+    if (res.ok) {
+      const payload = (await res.json()) as { choices: { message: { content: string } }[] };
+      const raw = payload.choices?.[0]?.message?.content ?? "";
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Model did not return JSON.");
+      return JSON.parse(jsonMatch[0]);
+    }
+
     const text = await res.text();
-    throw new Error(`Groq API error ${res.status}: ${text.slice(0, 500)}`);
+    if (res.status === 429 && attempt < retries) {
+      const retryAfterHeader = Number(res.headers.get("retry-after") ?? "");
+      const retrySeconds = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+        ? retryAfterHeader
+        : retrySecondsFromGroqError(text) ?? 30;
+      await sleep(Math.min(retrySeconds * 1000 + 750, 35_000));
+      continue;
+    }
+
+    throw new Error(toFriendlyGroqError(res.status, text));
   }
-  const payload = (await res.json()) as { choices: { message: { content: string } }[] };
-  const raw = payload.choices?.[0]?.message?.content ?? "";
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Model did not return JSON.");
-  return JSON.parse(jsonMatch[0]);
+
+  throw new Error("AI provider request failed after retrying.");
 }
 
 /* ============================== ANALYZE JD ============================== */
@@ -154,7 +195,11 @@ export const analyzeJD = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data }): Promise<JDAnalysis> => {
-    const out = await callGroq(ANALYZE_SYSTEM, `JOB DESCRIPTION:\n${data.jd}\n\nReturn the JSON object now.`);
+    const out = await callGroq(
+      ANALYZE_SYSTEM,
+      `JOB DESCRIPTION:\n${truncateText(data.jd, 2800)}\n\nReturn the JSON object now.`,
+      { maxTokens: 1600, maxUserChars: 3200, retries: 1 },
+    );
     return out as JDAnalysis;
   });
 
@@ -162,14 +207,16 @@ export const analyzeJD = createServerFn({ method: "POST" })
 
 const EVAL_SYSTEM = `You are an Explainable Resume Evaluation Assistant. The recruiter has LOCKED a hiring rubric (guardrails, weightage buckets, critical requirements). You MUST use this exact rubric — do not invent new guardrails and do not change weightages.
 
+Keep the JSON compact. Use short phrases and one-sentence explanations. Evidence arrays must contain only exact or near-exact resume snippets. Do not include markdown.
+
 Process:
 1. Evaluate the resume against EACH locked guardrail using ONLY evidence explicitly present in the resume. Never infer missing experience.
 2. Map each guardrail to one of the 5 weightage buckets (skills_match, experience_match, domain_relevance, critical_requirements, risk_factors) and distribute that bucket's weight across guardrails mapped to it. The "weight" you report per guardrail must equal its share of its bucket weight; the sum of ALL guardrail weights must equal 100.
 3. Score each guardrail: Strong Match=100%, Partial Match=60%, Weak Match=30%, No Evidence=0% of its weight. contribution = weight * factor.
 4. match_score = sum of contributions, rounded to nearest integer.
 5. Decision: >=80 Strong Proceed, 70-79 Proceed with Review, 50-69 Manual Review Required, <50 Unlikely Fit. Missing any critical requirement => Unlikely Fit regardless of score. Ambiguous evidence => Manual Review Required.
-6. Generate EXACTLY 5 recommended recruiter screening questions. Prioritize: missing evidence, weak matches, risk alerts, critical requirements, decision-changing information. For each, include "why" explaining why this question is being asked.
-7. Also generate 6-10 deeper interview questions across categories: Ownership, Decision-Making, Problem Solving, Impact Validation, Stakeholder Management, Domain Expertise, Risk Areas, Growth Potential.
+6. Set top_5_questions to an empty array.
+7. Generate exactly 5 deeper interview questions across the most relevant categories.
 8. In score_calculation, explain CLEARLY how the recruiter-locked guardrails and weightages produced the final decision.
 
 Return STRICT JSON ONLY, no markdown:
@@ -201,8 +248,19 @@ export const evaluateResume = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data }): Promise<EvaluationResult> => {
-    const criteriaText = JSON.stringify(data.criteria, null, 2);
-    const user = `JOB DESCRIPTION:\n${data.jd}\n\n---\n\nRECRUITER-LOCKED CRITERIA (use exactly this rubric):\n${criteriaText}\n\n---\n\nRESUME:\n${data.resume}\n\nReturn the JSON object now.`;
-    const out = await callGroq(EVAL_SYSTEM, user);
+    const compactCriteria = {
+      guardrails: data.criteria.guardrails.map((g) => ({
+        name: truncateText(g.name, 80),
+        explanation: truncateText(g.explanation, 180),
+        importance: g.importance,
+      })),
+      weightages: data.criteria.weightages.map((w) => ({
+        label: truncateText(w.label, 90),
+        weight: w.weight,
+      })),
+      critical_requirements: data.criteria.critical_requirements.map((r) => truncateText(r, 120)),
+    };
+    const user = `JD:\n${truncateText(data.jd, 900)}\n\nLOCKED_CRITERIA_JSON:\n${JSON.stringify(compactCriteria)}\n\nRESUME:\n${truncateText(data.resume, 2600)}\n\nReturn only the JSON object.`;
+    const out = await callGroq(EVAL_SYSTEM, user, { maxTokens: 1900, maxUserChars: 5200, retries: 1 });
     return out as EvaluationResult;
   });
