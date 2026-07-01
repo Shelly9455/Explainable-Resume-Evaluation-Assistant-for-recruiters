@@ -476,8 +476,8 @@ function fallbackGuardrailEvaluation(item: EvaluationItem, resume: string): Comp
     ev: hits.length ? `Keyword evidence: ${hits.slice(0, 4).join(", ")}` : "No direct evidence",
     str: hits.length ? [`Evidence mentions ${hits.slice(0, 2).join(" and ")}.`] : [],
     miss: st === "No Evidence" ? [`No evidence for ${item.label}.`] : [],
-    risk: item.importance === "High" && st !== "Strong Match" ? [`High-weight gap may reduce fit for ${item.label}.`] : [],
-    gap: st !== "Strong Match" ? [`More proof needed for ${item.label}.`] : [],
+    risk: item.importance === "High" ? [`High-weight gap may reduce fit for ${item.label}.`] : [],
+    gap: [`More proof needed for ${item.label}.`],
     verify: [`Verify ${item.label} with concrete examples.`],
     kw: keywords,
   };
