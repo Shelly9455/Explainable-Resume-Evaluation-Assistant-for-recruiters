@@ -165,9 +165,19 @@ function Index() {
               <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Back to resume
               </Button>
-              <Button variant="outline" size="sm" onClick={reset} className="gap-2">
-                <RotateCcw className="h-4 w-4" /> New evaluation
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => { setResume(""); setResult(null); setError(null); setStep(3); }}
+                  className="gap-2"
+                >
+                  <FileText className="h-4 w-4" /> Analyze another resume
+                </Button>
+                <Button variant="outline" size="sm" onClick={reset} className="gap-2">
+                  <RotateCcw className="h-4 w-4" /> New JD
+                </Button>
+              </div>
             </div>
             <Report result={result} resume={resume} jd={jd} criteria={lockedCriteria} />
           </div>
