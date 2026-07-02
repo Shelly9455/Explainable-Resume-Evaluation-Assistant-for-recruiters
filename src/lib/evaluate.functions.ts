@@ -109,6 +109,16 @@ const STOP_WORDS = new Set([
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function hashString(text: string) {
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) | 0;
+  }
+  return String(hash);
+}
+
+const analyzeCache = new Map<string, JDAnalysis>();
+
 function truncateText(text: string, maxChars: number) {
   if (text.length <= maxChars) return text;
   const head = Math.floor(maxChars * 0.7);
@@ -306,12 +316,17 @@ export const analyzeJD = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data }): Promise<JDAnalysis> => {
+    const cacheKey = hashString(data.jd.replace(/\s+/g, " ").trim().toLowerCase());
+    const cached = analyzeCache.get(cacheKey);
+    if (cached) return cached;
     const out = await callGroq(
       ANALYZE_SYSTEM,
       `JOB DESCRIPTION:\n${truncateText(data.jd, 2800)}\n\nReturn the JSON object now.`,
       { maxTokens: 1600, maxUserChars: 3200, retries: 1, temperature: 0, seed: 42 },
     );
-    return out as JDAnalysis;
+    const analysis = out as JDAnalysis;
+    analyzeCache.set(cacheKey, analysis);
+    return analysis;
   });
 
 /* ============================== EVALUATE RESUME ============================== */
@@ -497,7 +512,13 @@ async function evaluateOneItem(item: EvaluationItem, resume: string): Promise<Co
   })}\n\nRESUME_EVIDENCE:\n${context || "No matching resume section found."}\n\nReturn JSON now.`;
 
   try {
-    return await callGroq(EVAL_SYSTEM, user, { maxTokens: 520, maxUserChars: 1750, retries: 1 }) as CompactGuardrailResult;
+    return await callGroq(EVAL_SYSTEM, user, {
+      maxTokens: 520,
+      maxUserChars: 1750,
+      retries: 1,
+      temperature: 0,
+      seed: 42,
+    }) as CompactGuardrailResult;
   } catch {
     return fallbackGuardrailEvaluation(item, resume);
   }
