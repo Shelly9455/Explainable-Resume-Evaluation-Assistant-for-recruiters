@@ -169,7 +169,7 @@ function Index() {
                 <RotateCcw className="h-4 w-4" /> New evaluation
               </Button>
             </div>
-            <Report result={result} resume={resume} />
+            <Report result={result} resume={resume} jd={jd} criteria={lockedCriteria} />
           </div>
         )}
       </main>
