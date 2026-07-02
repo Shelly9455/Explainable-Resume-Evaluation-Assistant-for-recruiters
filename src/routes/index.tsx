@@ -729,7 +729,29 @@ function EditableFieldBlock({ tone, label, value, onChange, placeholder }: {
 
 function Report({ result, resume }: { result: EvaluationResult; resume: string }) {
   const kw = useMemo(
-    () => (result.rubric_keywords || []).filter(Boolean).sort((a, b) => b.length - a.length),
+    () => {
+      const BANNED = new Set([
+        "relevant", "strong", "good", "great", "excellent", "solid", "proven", "demonstrated",
+        "significant", "extensive", "deep", "broad", "hands-on", "hands on", "expert", "expertise",
+        "experienced", "experience", "skilled", "skills", "ability", "able", "knowledge",
+        "understanding", "familiar", "familiarity", "working", "proficient", "proficiency",
+        "quality", "successful", "effective", "excellence", "advanced", "senior", "junior",
+        "required", "preferred", "must", "should", "nice", "plus", "bonus", "high", "medium", "low",
+        "match", "matches", "candidate", "role", "team", "company",
+      ]);
+      const isAdjectivePhrase = (k: string) => {
+        const t = k.trim().toLowerCase();
+        if (!t) return true;
+        if (BANNED.has(t)) return true;
+        // single-word generic adjectives ending in common suffixes
+        if (!t.includes(" ") && /(ly|ive|ous|able|ible|ent|ant)$/.test(t)) return true;
+        return false;
+      };
+      return (result.rubric_keywords || [])
+        .filter(Boolean)
+        .filter((k) => !isAdjectivePhrase(k))
+        .sort((a, b) => b.length - a.length);
+    },
     [result.rubric_keywords],
   );
   const { matched, missing } = useMemo(() => {
