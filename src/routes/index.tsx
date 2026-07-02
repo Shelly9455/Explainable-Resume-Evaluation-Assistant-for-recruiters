@@ -727,7 +727,7 @@ function EditableFieldBlock({ tone, label, value, onChange, placeholder }: {
 
 /* ============================ REPORT (STEP 4) ============================ */
 
-function Report({ result, resume }: { result: EvaluationResult; resume: string }) {
+function Report({ result, resume, jd, criteria }: { result: EvaluationResult; resume: string; jd: string; criteria: LockedCriteria }) {
   const kw = useMemo(
     () => {
       const BANNED = new Set([
@@ -743,16 +743,58 @@ function Report({ result, resume }: { result: EvaluationResult; resume: string }
         const t = k.trim().toLowerCase();
         if (!t) return true;
         if (BANNED.has(t)) return true;
-        // single-word generic adjectives ending in common suffixes
         if (!t.includes(" ") && /(ly|ive|ous|able|ible|ent|ant)$/.test(t)) return true;
         return false;
       };
-      return (result.rubric_keywords || [])
-        .filter(Boolean)
-        .filter((k) => !isAdjectivePhrase(k))
-        .sort((a, b) => b.length - a.length);
+
+      // 1) Keywords from the AI evaluation
+      const fromAI = result.rubric_keywords || [];
+
+      // 2) Keywords derived from the recruiter-locked criteria (guardrails, weightages, critical reqs)
+      const criteriaText = [
+        ...(criteria.guardrails || []).flatMap((g) => [g.name, g.explanation]),
+        ...(criteria.weightages || []).map((w) => w.label),
+        ...(criteria.critical_requirements || []),
+      ].filter(Boolean).join(" \n ");
+
+      // 3) Tool / tech / proper-noun mining from JD + criteria text
+      const source = `${criteriaText}\n${jd || ""}`;
+      const mined = new Set<string>();
+
+      // Acronyms: 2-6 uppercase letters/digits (AWS, SQL, GTM, B2B, SaaS, API, KPI, CRM, ERP)
+      for (const m of source.matchAll(/\b([A-Z][A-Z0-9]{1,5})\b/g)) mined.add(m[1]);
+
+      // Tech tokens with symbols/case: React, Node.js, TypeScript, Next.js, C++, C#, .NET, Kubernetes, PostgreSQL
+      for (const m of source.matchAll(/\b([A-Z][a-zA-Z0-9]*(?:[.+#][A-Za-z0-9]+)+|[A-Z][a-zA-Z]{2,}(?:[A-Z][a-zA-Z]*)+|\.NET|C\+\+|C#)\b/g)) {
+        mined.add(m[0]);
+      }
+
+      // Capitalized proper nouns 1-3 words (Salesforce, HubSpot, Google Cloud, Adobe Analytics)
+      for (const m of source.matchAll(/\b([A-Z][a-zA-Z]{2,}(?:\s+[A-Z][a-zA-Z]+){0,2})\b/g)) {
+        mined.add(m[1]);
+      }
+
+      // Quoted / parenthetical tool lists e.g. "(Figma, Sketch, Zeplin)"
+      for (const m of source.matchAll(/[(,/]\s*([A-Za-z][A-Za-z0-9.+#-]{1,24})\s*(?=[,)])/g)) {
+        if (/[A-Z]/.test(m[1]) || /[.+#]/.test(m[1])) mined.add(m[1]);
+      }
+
+      // 4) Merge, dedupe (case-insensitive), filter generic/banned
+      const seen = new Set<string>();
+      const merged: string[] = [];
+      for (const raw of [...fromAI, ...Array.from(mined)]) {
+        const t = raw.trim();
+        if (!t || t.length < 2) continue;
+        if (isAdjectivePhrase(t)) continue;
+        const key = t.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(t);
+      }
+      // Longer phrases first so highlighting prefers multi-word matches
+      return merged.sort((a, b) => b.length - a.length);
     },
-    [result.rubric_keywords],
+    [result.rubric_keywords, criteria, jd],
   );
   const { matched, missing } = useMemo(() => {
     const r = resume.toLowerCase();
