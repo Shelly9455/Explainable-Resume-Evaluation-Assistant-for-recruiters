@@ -497,7 +497,13 @@ async function evaluateOneItem(item: EvaluationItem, resume: string): Promise<Co
   })}\n\nRESUME_EVIDENCE:\n${context || "No matching resume section found."}\n\nReturn JSON now.`;
 
   try {
-    return await callGroq(EVAL_SYSTEM, user, { maxTokens: 520, maxUserChars: 1750, retries: 1 }) as CompactGuardrailResult;
+    return await callGroq(EVAL_SYSTEM, user, {
+      maxTokens: 520,
+      maxUserChars: 1750,
+      retries: 1,
+      temperature: 0,
+      seed: 42,
+    }) as CompactGuardrailResult;
   } catch {
     return fallbackGuardrailEvaluation(item, resume);
   }
