@@ -79,6 +79,8 @@ type GroqCallOptions = {
   maxTokens: number;
   maxUserChars: number;
   retries?: number;
+  temperature?: number;
+  seed?: number;
 };
 
 type EvaluationItem = {
@@ -225,7 +227,8 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
-        temperature: 0.1,
+        temperature: options.temperature ?? 0.1,
+        seed: options.seed,
         max_tokens: options.maxTokens,
         response_format: { type: "json_object" },
         messages: [
@@ -306,7 +309,7 @@ export const analyzeJD = createServerFn({ method: "POST" })
     const out = await callGroq(
       ANALYZE_SYSTEM,
       `JOB DESCRIPTION:\n${truncateText(data.jd, 2800)}\n\nReturn the JSON object now.`,
-      { maxTokens: 1600, maxUserChars: 3200, retries: 1 },
+      { maxTokens: 1600, maxUserChars: 3200, retries: 1, temperature: 0, seed: 42 },
     );
     return out as JDAnalysis;
   });
