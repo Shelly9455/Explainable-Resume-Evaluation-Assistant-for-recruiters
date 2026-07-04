@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { track } from "@/lib/analytics-track";
 import {
   analyzeJD,
   evaluateResume,
@@ -68,9 +69,13 @@ function Index() {
   const analyze = useServerFn(analyzeJD);
   const evaluate = useServerFn(evaluateResume);
 
+  const evalStartRef = useRef<number | null>(null);
+  useEffect(() => { track("visitor"); }, []);
+
   const onAnalyzeJD = async () => {
     setError(null); setLoading(true);
     try {
+      track("jd_upload");
       const a = await analyze({ data: { jd } });
       setAnalysis(a);
       setGuardrails(a.suggested_guardrails.map((g) => ({ ...g, status: "pending" as ReviewStatus })));
@@ -100,9 +105,13 @@ function Index() {
 
   const onEvaluate = async () => {
     setError(null); setLoading(true);
+    track("resume_upload");
+    evalStartRef.current = Date.now();
     try {
       const r = await evaluate({ data: { jd, resume, criteria: lockedCriteria } });
       setResult(r);
+      const started = evalStartRef.current;
+      track("evaluation_complete", started ? { duration_ms: Date.now() - started } : undefined);
       setStep(4);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
@@ -821,6 +830,11 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
   const missingSet = useMemo(() => new Set(missing.map((k) => k.toLowerCase())), [missing]);
 
   const [feedback, setFeedback] = useState<"yes" | "partially" | "no" | null>(null);
+  const pickFeedback = (v: "yes" | "partially" | "no") => {
+    if (feedback === v) return;
+    setFeedback(v);
+    track("agreement", { agreement: v });
+  };
 
   return (
     <div className="space-y-6">
@@ -832,7 +846,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
             <Button
               variant={feedback === "yes" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFeedback("yes")}
+              onClick={() => pickFeedback("yes")}
               className="gap-2"
             >
               <CheckCircle2 className="h-4 w-4" /> Yes
@@ -840,7 +854,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
             <Button
               variant={feedback === "partially" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFeedback("partially")}
+              onClick={() => pickFeedback("partially")}
               className="gap-2"
             >
               <AlertTriangle className="h-4 w-4" /> Partially
@@ -848,7 +862,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
             <Button
               variant={feedback === "no" ? "destructive" : "outline"}
               size="sm"
-              onClick={() => setFeedback("no")}
+              onClick={() => pickFeedback("no")}
               className="gap-2"
             >
               <XCircle className="h-4 w-4" /> No

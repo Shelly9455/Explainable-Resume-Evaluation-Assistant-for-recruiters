@@ -9,8 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AdminX7k2RouteImport } from './routes/admin-x7k2'
 import { Route as IndexRouteImport } from './routes/index'
 
+const AdminX7k2Route = AdminX7k2RouteImport.update({
+  id: '/admin-x7k2',
+  path: '/admin-x7k2',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +25,39 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin-x7k2': typeof AdminX7k2Route
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin-x7k2': typeof AdminX7k2Route
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin-x7k2': typeof AdminX7k2Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/admin-x7k2'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/admin-x7k2'
+  id: '__root__' | '/' | '/admin-x7k2'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminX7k2Route: typeof AdminX7k2Route
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/admin-x7k2': {
+      id: '/admin-x7k2'
+      path: '/admin-x7k2'
+      fullPath: '/admin-x7k2'
+      preLoaderRoute: typeof AdminX7k2RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +70,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminX7k2Route: AdminX7k2Route,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
