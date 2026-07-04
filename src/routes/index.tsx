@@ -820,9 +820,49 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
   const matchedSet = useMemo(() => new Set(matched.map((k) => k.toLowerCase())), [matched]);
   const missingSet = useMemo(() => new Set(missing.map((k) => k.toLowerCase())), [missing]);
 
+  const [feedback, setFeedback] = useState<"yes" | "partially" | "no" | null>(null);
+
   return (
     <div className="space-y-6">
       <DecisionHero result={result} />
+
+      <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Did you agree with the recommendation?" full>
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant={feedback === "yes" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFeedback("yes")}
+              className="gap-2"
+            >
+              <CheckCircle2 className="h-4 w-4" /> Yes
+            </Button>
+            <Button
+              variant={feedback === "partially" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFeedback("partially")}
+              className="gap-2"
+            >
+              <AlertTriangle className="h-4 w-4" /> Partially
+            </Button>
+            <Button
+              variant={feedback === "no" ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setFeedback("no")}
+              className="gap-2"
+            >
+              <XCircle className="h-4 w-4" /> No
+            </Button>
+          </div>
+          {feedback && (
+            <p className="text-sm text-muted-foreground">
+              {feedback === "yes" && "Thanks — the evaluation matched your view."}
+              {feedback === "partially" && "Noted — some parts matched, but the full picture needs a second look."}
+              {feedback === "no" && "Thanks — your feedback will help tune the rubric and catch blind spots."}
+            </p>
+          )}
+        </div>
+      </ReportCard>
 
       <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary" full>
         <p className="text-sm leading-relaxed text-foreground/90">
