@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { track } from "@/lib/analytics-track";
 import {
   analyzeJD,
   evaluateResume,
@@ -68,9 +69,13 @@ function Index() {
   const analyze = useServerFn(analyzeJD);
   const evaluate = useServerFn(evaluateResume);
 
+  const evalStartRef = useRef<number | null>(null);
+  useEffect(() => { track("visitor"); }, []);
+
   const onAnalyzeJD = async () => {
     setError(null); setLoading(true);
     try {
+      track("jd_upload");
       const a = await analyze({ data: { jd } });
       setAnalysis(a);
       setGuardrails(a.suggested_guardrails.map((g) => ({ ...g, status: "pending" as ReviewStatus })));
@@ -100,9 +105,13 @@ function Index() {
 
   const onEvaluate = async () => {
     setError(null); setLoading(true);
+    track("resume_upload");
+    evalStartRef.current = Date.now();
     try {
       const r = await evaluate({ data: { jd, resume, criteria: lockedCriteria } });
       setResult(r);
+      const started = evalStartRef.current;
+      track("evaluation_complete", started ? { duration_ms: Date.now() - started } : undefined);
       setStep(4);
     } catch (e) { setError((e as Error).message); }
     finally { setLoading(false); }
