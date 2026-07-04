@@ -830,6 +830,11 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
   const missingSet = useMemo(() => new Set(missing.map((k) => k.toLowerCase())), [missing]);
 
   const [feedback, setFeedback] = useState<"yes" | "partially" | "no" | null>(null);
+  const pickFeedback = (v: "yes" | "partially" | "no") => {
+    if (feedback === v) return;
+    setFeedback(v);
+    track("agreement", { agreement: v });
+  };
 
   return (
     <div className="space-y-6">
@@ -841,7 +846,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
             <Button
               variant={feedback === "yes" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFeedback("yes")}
+              onClick={() => pickFeedback("yes")}
               className="gap-2"
             >
               <CheckCircle2 className="h-4 w-4" /> Yes
@@ -849,7 +854,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
             <Button
               variant={feedback === "partially" ? "default" : "outline"}
               size="sm"
-              onClick={() => setFeedback("partially")}
+              onClick={() => pickFeedback("partially")}
               className="gap-2"
             >
               <AlertTriangle className="h-4 w-4" /> Partially
@@ -857,7 +862,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
             <Button
               variant={feedback === "no" ? "destructive" : "outline"}
               size="sm"
-              onClick={() => setFeedback("no")}
+              onClick={() => pickFeedback("no")}
               className="gap-2"
             >
               <XCircle className="h-4 w-4" /> No
