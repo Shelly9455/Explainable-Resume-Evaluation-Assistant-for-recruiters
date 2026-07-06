@@ -840,11 +840,31 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
     <div className="space-y-6">
       <DecisionHero result={result} />
 
-      <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary" full>
-        <p className="text-sm leading-relaxed text-foreground/90">
-          <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
-        </p>
-      </ReportCard>
+      <SectionGrid>
+        <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary">
+          <p className="text-sm leading-relaxed text-foreground/90">
+            <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
+          </p>
+        </ReportCard>
+
+        <ReportCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements">
+          <ul className="space-y-2 text-sm">
+            {result.critical_requirements?.map((c, i) => (
+              <li key={i} className="flex items-start gap-2">
+                {c.met ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "oklch(0.62 0.16 155)" }} />
+                ) : (
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                )}
+                <span>
+                  <span className="font-medium"><HL text={c.requirement} keywords={kw} matched={matchedSet} missing={missingSet} /></span>
+                  {c.note && <span className="text-muted-foreground"> — <HL text={c.note} keywords={kw} matched={matchedSet} missing={missingSet} /></span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </ReportCard>
+      </SectionGrid>
 
       <SectionGrid>
         <ReportCard icon={<Scale className="h-4 w-4" />} title="Key Insights">
