@@ -840,44 +840,6 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
     <div className="space-y-6">
       <DecisionHero result={result} />
 
-      <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Did you agree with the recommendation?" full>
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant={feedback === "yes" ? "default" : "outline"}
-              size="sm"
-              onClick={() => pickFeedback("yes")}
-              className="gap-2"
-            >
-              <CheckCircle2 className="h-4 w-4" /> Yes
-            </Button>
-            <Button
-              variant={feedback === "partially" ? "default" : "outline"}
-              size="sm"
-              onClick={() => pickFeedback("partially")}
-              className="gap-2"
-            >
-              <AlertTriangle className="h-4 w-4" /> Partially
-            </Button>
-            <Button
-              variant={feedback === "no" ? "destructive" : "outline"}
-              size="sm"
-              onClick={() => pickFeedback("no")}
-              className="gap-2"
-            >
-              <XCircle className="h-4 w-4" /> No
-            </Button>
-          </div>
-          {feedback && (
-            <p className="text-sm text-muted-foreground">
-              {feedback === "yes" && "Thanks — the evaluation matched your view."}
-              {feedback === "partially" && "Noted — some parts matched, but the full picture needs a second look."}
-              {feedback === "no" && "Thanks — your feedback will help tune the rubric and catch blind spots."}
-            </p>
-          )}
-        </div>
-      </ReportCard>
-
       <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary" full>
         <p className="text-sm leading-relaxed text-foreground/90">
           <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
@@ -926,6 +888,44 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
           <SubList title="Assumptions Made" tone="info" items={result.assumptions} kw={kw} matched={matchedSet} missing={missingSet} dense />
           <SubList title="Missing Information" tone="warning" items={result.missing_information} kw={kw} matched={matchedSet} missing={missingSet} dense />
           <SubList title="Verification Needed" tone="info" items={result.verification_needed} kw={kw} matched={matchedSet} missing={missingSet} dense />
+        </div>
+      </ReportCard>
+
+      <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Did you agree with the recommendation?" full>
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant={feedback === "yes" ? "default" : "outline"}
+              size="sm"
+              onClick={() => pickFeedback("yes")}
+              className="gap-2"
+            >
+              <CheckCircle2 className="h-4 w-4" /> Yes
+            </Button>
+            <Button
+              variant={feedback === "partially" ? "default" : "outline"}
+              size="sm"
+              onClick={() => pickFeedback("partially")}
+              className="gap-2"
+            >
+              <AlertTriangle className="h-4 w-4" /> Partially
+            </Button>
+            <Button
+              variant={feedback === "no" ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => pickFeedback("no")}
+              className="gap-2"
+            >
+              <XCircle className="h-4 w-4" /> No
+            </Button>
+          </div>
+          {feedback && (
+            <p className="text-sm text-muted-foreground">
+              {feedback === "yes" && "Thanks — the evaluation matched your view."}
+              {feedback === "partially" && "Noted — some parts matched, but the full picture needs a second look."}
+              {feedback === "no" && "Thanks — your feedback will help tune the rubric and catch blind spots."}
+            </p>
+          )}
         </div>
       </ReportCard>
     </div>
