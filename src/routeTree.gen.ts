@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AdminX7k2RouteImport } from './routes/admin-x7k2'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicHooksSyncAnalyticsSheetRouteImport } from './routes/api/public/hooks/sync-analytics-sheet'
 
 const AdminX7k2Route = AdminX7k2RouteImport.update({
   id: '/admin-x7k2',
@@ -22,31 +23,45 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksSyncAnalyticsSheetRoute =
+  ApiPublicHooksSyncAnalyticsSheetRouteImport.update({
+    id: '/api/public/hooks/sync-analytics-sheet',
+    path: '/api/public/hooks/sync-analytics-sheet',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin-x7k2': typeof AdminX7k2Route
+  '/api/public/hooks/sync-analytics-sheet': typeof ApiPublicHooksSyncAnalyticsSheetRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin-x7k2': typeof AdminX7k2Route
+  '/api/public/hooks/sync-analytics-sheet': typeof ApiPublicHooksSyncAnalyticsSheetRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin-x7k2': typeof AdminX7k2Route
+  '/api/public/hooks/sync-analytics-sheet': typeof ApiPublicHooksSyncAnalyticsSheetRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin-x7k2'
+  fullPaths: '/' | '/admin-x7k2' | '/api/public/hooks/sync-analytics-sheet'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin-x7k2'
-  id: '__root__' | '/' | '/admin-x7k2'
+  to: '/' | '/admin-x7k2' | '/api/public/hooks/sync-analytics-sheet'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin-x7k2'
+    | '/api/public/hooks/sync-analytics-sheet'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminX7k2Route: typeof AdminX7k2Route
+  ApiPublicHooksSyncAnalyticsSheetRoute: typeof ApiPublicHooksSyncAnalyticsSheetRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,23 +80,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/sync-analytics-sheet': {
+      id: '/api/public/hooks/sync-analytics-sheet'
+      path: '/api/public/hooks/sync-analytics-sheet'
+      fullPath: '/api/public/hooks/sync-analytics-sheet'
+      preLoaderRoute: typeof ApiPublicHooksSyncAnalyticsSheetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminX7k2Route: AdminX7k2Route,
+  ApiPublicHooksSyncAnalyticsSheetRoute: ApiPublicHooksSyncAnalyticsSheetRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
