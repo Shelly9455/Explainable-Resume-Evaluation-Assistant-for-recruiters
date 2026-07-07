@@ -840,31 +840,29 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
     <div className="space-y-6">
       <DecisionHero result={result} />
 
-      <SectionGrid>
-        <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary">
-          <p className="text-sm leading-relaxed text-foreground/90">
+      <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary" full>
+        <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
+          <p>
             <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
           </p>
-        </ReportCard>
-
-        <ReportCard icon={<Shield className="h-4 w-4" />} title="Critical Requirements">
-          <ul className="space-y-2 text-sm">
-            {result.critical_requirements?.map((c, i) => (
-              <li key={i} className="flex items-start gap-2">
-                {c.met ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "oklch(0.62 0.16 155)" }} />
-                ) : (
-                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-                )}
-                <span>
-                  <span className="font-medium"><HL text={c.requirement} keywords={kw} matched={matchedSet} missing={missingSet} /></span>
-                  {c.note && <span className="text-muted-foreground"> — <HL text={c.note} keywords={kw} matched={matchedSet} missing={missingSet} /></span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </ReportCard>
-      </SectionGrid>
+          {result.description && (
+            <div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recommendation Rationale</div>
+              <p>
+                <HL text={result.description} keywords={kw} matched={matchedSet} missing={missingSet} />
+              </p>
+            </div>
+          )}
+          {result.score_calculation && (
+            <div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score Calculation</div>
+              <p className="text-foreground/80">
+                <HL text={result.score_calculation} keywords={kw} matched={matchedSet} missing={missingSet} />
+              </p>
+            </div>
+          )}
+        </div>
+      </ReportCard>
 
       <SectionGrid>
         <ReportCard icon={<Scale className="h-4 w-4" />} title="Key Insights">
