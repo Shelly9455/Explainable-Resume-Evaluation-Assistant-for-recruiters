@@ -51,18 +51,32 @@ interface EditableCriticalReq extends CriticalRequirement {
   status: ReviewStatus;
 }
 
+interface ResumeEntry {
+  id: string;
+  name: string;
+  text: string;
+}
+
+interface ResumeResult {
+  id: string;
+  name: string;
+  resume: string;
+  result: EvaluationResult;
+}
+
 function Index() {
   const [step, setStep] = useState<Step>(1);
 
   const [jd, setJd] = useState("");
-  const [resume, setResume] = useState("");
+  const [resumes, setResumes] = useState<ResumeEntry[]>([]);
 
   const [analysis, setAnalysis] = useState<JDAnalysis | null>(null);
   const [guardrails, setGuardrails] = useState<EditableGuardrail[]>([]);
   const [weights, setWeights] = useState<WeightageBucket[]>([]);
   const [criticalReqs, setCriticalReqs] = useState<EditableCriticalReq[]>([]);
 
-  const [result, setResult] = useState<EvaluationResult | null>(null);
+  const [results, setResults] = useState<ResumeResult[]>([]);
+  const [evalProgress, setEvalProgress] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,21 +119,27 @@ function Index() {
 
   const onEvaluate = async () => {
     setError(null); setLoading(true);
-    track("resume_upload");
     evalStartRef.current = Date.now();
+    const out: ResumeResult[] = [];
     try {
-      const r = await evaluate({ data: { jd, resume, criteria: lockedCriteria } });
-      setResult(r);
+      for (let i = 0; i < resumes.length; i++) {
+        const entry = resumes[i];
+        setEvalProgress(`Evaluating ${i + 1} of ${resumes.length}: ${entry.name}`);
+        track("resume_upload");
+        const r = await evaluate({ data: { jd, resume: entry.text, criteria: lockedCriteria } });
+        out.push({ id: entry.id, name: entry.name, resume: entry.text, result: r });
+      }
+      setResults(out);
       const started = evalStartRef.current;
       track("evaluation_complete", started ? { duration_ms: Date.now() - started } : undefined);
       setStep(4);
     } catch (e) { setError((e as Error).message); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setEvalProgress(null); }
   };
 
   const reset = () => {
-    setStep(1); setJd(""); setResume(""); setAnalysis(null);
-    setGuardrails([]); setWeights([]); setCriticalReqs([]); setResult(null); setError(null);
+    setStep(1); setJd(""); setResumes([]); setAnalysis(null);
+    setGuardrails([]); setWeights([]); setCriticalReqs([]); setResults([]); setError(null);
   };
 
   return (
@@ -158,37 +178,59 @@ function Index() {
 
         {step === 3 && (
           <Step3
-            resume={resume} setResume={setResume}
+            resumes={resumes} setResumes={setResumes}
             activeGuardrails={activeGuardrails}
             weights={weights}
             criticalCount={approvedCriticals}
             loading={loading}
+            progress={evalProgress}
             onBack={() => setStep(2)}
             onEvaluate={onEvaluate}
           />
         )}
 
-        {step === 4 && result && (
+        {step === 4 && results.length > 0 && (
           <div>
             <div className="mb-6 flex items-center justify-between">
               <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="gap-2">
-                <ArrowLeft className="h-4 w-4" /> Back to resume
+                <ArrowLeft className="h-4 w-4" /> Back to resumes
               </Button>
               <div className="flex items-center gap-2">
                 <Button
                   variant="default"
                   size="sm"
-                  onClick={() => { setResume(""); setResult(null); setError(null); setStep(3); }}
+                  onClick={() => { setResumes([]); setResults([]); setError(null); setStep(3); }}
                   className="gap-2"
                 >
-                  <FileText className="h-4 w-4" /> Analyze another resume
+                  <FileText className="h-4 w-4" /> Analyze more resumes
                 </Button>
                 <Button variant="outline" size="sm" onClick={reset} className="gap-2">
                   <RotateCcw className="h-4 w-4" /> New JD
                 </Button>
               </div>
             </div>
-            <Report result={result} resume={resume} jd={jd} criteria={lockedCriteria} />
+            <div className="space-y-10">
+              {results.map((r, i) => (
+                <div key={r.id} className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                        {i + 1}
+                      </span>
+                      <div>
+                        <div className="text-xs uppercase tracking-widest text-muted-foreground">Candidate {i + 1} of {results.length}</div>
+                        <div className="text-sm font-semibold">{r.name}</div>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="text-[11px]">
+                      Score {Math.round(r.result.match_score)} / 100
+                    </Badge>
+                  </div>
+                  <Report result={r.result} resume={r.resume} jd={jd} criteria={lockedCriteria} />
+                  {i < results.length - 1 && <Separator className="my-6" />}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </main>
