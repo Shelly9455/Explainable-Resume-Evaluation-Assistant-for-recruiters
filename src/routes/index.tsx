@@ -650,17 +650,47 @@ function StatusTile({ icon, label, value, tone }: {
 /* ============================ STEP 3 ============================ */
 
 function Step3({
-  resume, setResume, activeGuardrails, weights, criticalCount, loading, onBack, onEvaluate,
+  resumes, setResumes, activeGuardrails, weights, criticalCount, loading, progress, onBack, onEvaluate,
 }: {
-  resume: string; setResume: (v: string) => void;
+  resumes: ResumeEntry[]; setResumes: (r: ResumeEntry[]) => void;
   activeGuardrails: number; weights: WeightageBucket[]; criticalCount: number;
-  loading: boolean; onBack: () => void; onEvaluate: () => void;
+  loading: boolean; progress: string | null; onBack: () => void; onEvaluate: () => void;
 }) {
-  const onFile = async (f: File | null) => {
-    if (!f) return;
-    const text = await extractFileText(f);
-    setResume(text);
+  const [pasted, setPasted] = useState("");
+  const [reading, setReading] = useState(false);
+
+  const onFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setReading(true);
+    try {
+      const added: ResumeEntry[] = [];
+      for (const f of Array.from(files)) {
+        const text = await extractFileText(f);
+        if (!text.trim()) continue;
+        added.push({
+          id: `r${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: f.name,
+          text,
+        });
+      }
+      setResumes([...resumes, ...added]);
+    } finally { setReading(false); }
   };
+
+  const addPasted = () => {
+    if (!pasted.trim()) return;
+    setResumes([...resumes, {
+      id: `r${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: `Pasted resume ${resumes.length + 1}`,
+      text: pasted.trim(),
+    }]);
+    setPasted("");
+  };
+
+  const removeResume = (id: string) => setResumes(resumes.filter((r) => r.id !== id));
+  const renameResume = (id: string, name: string) =>
+    setResumes(resumes.map((r) => (r.id === id ? { ...r, name } : r)));
+
   return (
     <div className="mt-8 space-y-6">
       <div className="flex items-center justify-between">
@@ -692,36 +722,71 @@ function Step3({
       </Card>
 
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload candidate resume</h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload candidate resumes</h1>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          The resume will be evaluated using your approved guardrails and weightages.
+          Add one or many resumes — each is evaluated against your locked criteria and shown one after the other.
         </p>
       </div>
 
       <Card className="overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)]">
-        <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-4 py-2.5">
+        <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-muted/40 px-4 py-2.5">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <FileText className="h-4 w-4" /> Candidate Resume
+            <FileText className="h-4 w-4" /> Candidate Resumes
+            {resumes.length > 0 && (
+              <Badge variant="secondary" className="text-[10px]">{resumes.length} loaded</Badge>
+            )}
           </div>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted">
-            <Upload className="h-3.5 w-3.5" /> Upload .pdf / .txt / .md
-            <input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" className="hidden"
-                   onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+            {reading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            {reading ? "Reading files…" : "Upload .pdf / .txt / .md (multiple)"}
+            <input type="file" multiple accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" className="hidden"
+                   onChange={(e) => { void onFiles(e.target.files); e.target.value = ""; }} />
           </label>
         </div>
-        <Textarea value={resume} onChange={(e) => setResume(e.target.value)}
-                  placeholder="Paste the candidate's resume text…"
-                  className="min-h-[320px] resize-y rounded-none border-0 bg-card font-mono text-[13px] leading-relaxed focus-visible:ring-0" />
+        <div className="divide-y divide-border/60">
+          {resumes.length === 0 && (
+            <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+              No resumes added yet. Upload PDFs/text files above or paste one below.
+            </div>
+          )}
+          {resumes.map((r, i) => (
+            <div key={r.id} className="flex items-center gap-2 px-4 py-2.5">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+                {i + 1}
+              </span>
+              <Input
+                value={r.name}
+                onChange={(e) => renameResume(r.id, e.target.value)}
+                className="h-8 flex-1 text-sm"
+              />
+              <span className="text-[11px] text-muted-foreground">{r.text.length.toLocaleString()} chars</span>
+              <Button size="sm" variant="ghost" onClick={() => removeResume(r.id)} className="h-8 w-8 p-0">
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </div>
+          ))}
+          <div className="space-y-2 bg-muted/20 px-4 py-3">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Or paste a resume</div>
+            <Textarea value={pasted} onChange={(e) => setPasted(e.target.value)}
+                      placeholder="Paste the candidate's resume text…"
+                      className="min-h-[140px] resize-y bg-card font-mono text-[13px] leading-relaxed" />
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" onClick={addPasted} disabled={!pasted.trim()} className="gap-2">
+                <Plus className="h-3.5 w-3.5" /> Add to list
+              </Button>
+            </div>
+          </div>
+        </div>
       </Card>
 
       <div className="flex flex-col items-center gap-2">
-        <Button size="lg" onClick={onEvaluate} disabled={loading || !resume.trim()}
+        <Button size="lg" onClick={onEvaluate} disabled={loading || resumes.length === 0}
                 className="h-12 gap-2 px-8 text-base shadow-[var(--shadow-elevated)]"
                 style={{ background: "var(--gradient-primary)" }}>
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-          {loading ? "Evaluating candidate…" : "Evaluate Candidate"}
+          {loading ? (progress ?? "Evaluating candidates…") : `Evaluate ${resumes.length || ""} candidate${resumes.length === 1 ? "" : "s"}`.replace(/\s+/g, " ").trim()}
         </Button>
-        <p className="text-xs text-muted-foreground">Only information explicitly present in the resume is used.</p>
+        <p className="text-xs text-muted-foreground">Only information explicitly present in each resume is used.</p>
       </div>
     </div>
   );
