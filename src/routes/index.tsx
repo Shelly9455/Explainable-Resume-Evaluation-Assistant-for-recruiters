@@ -68,6 +68,8 @@ interface ResumeResult {
 }
 
 function Index() {
+  const [started, setStarted] = useState(false);
+  const [mode, setMode] = useState<"recruiter" | "seeker" | null>(null);
   const [step, setStep] = useState<Step>(1);
 
   const [jd, setJd] = useState("");
