@@ -344,10 +344,7 @@ function Header() {
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground"
-               style={{ background: "var(--gradient-primary)" }}>
-            <Sparkles className="h-4 w-4" />
-          </div>
+          <img src={logo} alt="Lucid Hire" width={28} height={28} className="h-7 w-7 rounded-md object-contain" />
           <span className="text-sm font-semibold tracking-tight">Lucid Hire</span>
           <Badge variant="secondary" className="ml-1 text-[10px]">Beta</Badge>
         </div>
