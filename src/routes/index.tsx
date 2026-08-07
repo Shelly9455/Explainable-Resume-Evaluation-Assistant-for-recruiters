@@ -219,6 +219,19 @@ function Index() {
                 </div>
               ))}
             </div>
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+              <Button
+                variant="default"
+                size="lg"
+                onClick={() => { setResumes([]); setResults([]); setError(null); setStep(3); }}
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" /> Analyze more resumes
+              </Button>
+              <Button variant="outline" size="lg" onClick={reset} className="gap-2">
+                <RotateCcw className="h-4 w-4" /> New JD
+              </Button>
+            </div>
           </div>
         )}
       </main>
