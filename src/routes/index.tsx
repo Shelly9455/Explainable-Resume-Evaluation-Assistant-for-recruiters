@@ -151,101 +151,109 @@ function Index() {
     <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">
-        <Stepper current={step} />
-
-        {error && (
-          <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        {step === 1 && (
-          <Step1
-            jd={jd} setJd={setJd}
-            loading={loading} onNext={onAnalyzeJD}
+        {!started ? (
+          <Landing
+            onStart={(m) => { setMode(m); setStarted(true); }}
           />
-        )}
+        ) : (
+          <>
+            <Stepper current={step} />
 
-        {step === 2 && analysis && (
-          <Step2
-            analysis={analysis}
-            guardrails={guardrails} setGuardrails={setGuardrails}
-            weights={weights} setWeights={setWeights}
-            criticalReqs={criticalReqs} setCriticalReqs={setCriticalReqs}
-            totalWeight={totalWeight}
-            approvedGuardrails={activeGuardrails}
-            approvedCriticals={approvedCriticals}
-            pendingReview={pendingReview}
-            onBack={() => setStep(1)}
-            onLock={() => setStep(3)}
-          />
-        )}
+            {error && (
+              <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
 
-        {step === 3 && (
-          <Step3
-            resumes={resumes} setResumes={setResumes}
-            activeGuardrails={activeGuardrails}
-            weights={weights}
-            criticalCount={approvedCriticals}
-            loading={loading}
-            progress={evalProgress}
-            onBack={() => setStep(2)}
-            onEvaluate={onEvaluate}
-          />
-        )}
+            {step === 1 && (
+              <Step1
+                jd={jd} setJd={setJd}
+                loading={loading} onNext={onAnalyzeJD}
+              />
+            )}
 
-        {step === 4 && results.length > 0 && (
-          <div>
-            <div className="mb-6 flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="gap-2">
-                <ArrowLeft className="h-4 w-4" /> Back to resumes
-              </Button>
-              <div />
-            </div>
-            <div className="space-y-10">
-              {results.map((r, i) => (
-                <div key={r.id} className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                        {i + 1}
-                      </span>
-                      <div>
-                        <div className="text-xs uppercase tracking-widest text-muted-foreground">Candidate {i + 1} of {results.length}</div>
-                        <div className="text-sm font-semibold">{r.name}</div>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="text-[11px]">
-                      Score {Math.round(r.result.match_score)} / 100
-                    </Badge>
-                  </div>
-                  <Report result={r.result} resume={r.resume} jd={jd} criteria={lockedCriteria} />
-                  {i < results.length - 1 && <Separator className="my-6" />}
+            {step === 2 && analysis && (
+              <Step2
+                analysis={analysis}
+                guardrails={guardrails} setGuardrails={setGuardrails}
+                weights={weights} setWeights={setWeights}
+                criticalReqs={criticalReqs} setCriticalReqs={setCriticalReqs}
+                totalWeight={totalWeight}
+                approvedGuardrails={activeGuardrails}
+                approvedCriticals={approvedCriticals}
+                pendingReview={pendingReview}
+                onBack={() => setStep(1)}
+                onLock={() => setStep(3)}
+              />
+            )}
+
+            {step === 3 && (
+              <Step3
+                resumes={resumes} setResumes={setResumes}
+                activeGuardrails={activeGuardrails}
+                weights={weights}
+                criticalCount={approvedCriticals}
+                loading={loading}
+                progress={evalProgress}
+                onBack={() => setStep(2)}
+                onEvaluate={onEvaluate}
+              />
+            )}
+
+            {step === 4 && results.length > 0 && (
+              <div>
+                <div className="mb-6 flex items-center justify-between">
+                  <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="gap-2">
+                    <ArrowLeft className="h-4 w-4" /> Back to resumes
+                  </Button>
+                  <div />
                 </div>
-              ))}
-            </div>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-              <Button
-                variant="default"
-                size="lg"
-                onClick={() => { setResumes([]); setResults([]); setError(null); setStep(3); }}
-                className="gap-2"
-              >
-                <FileText className="h-4 w-4" /> Analyze more resumes
-              </Button>
-              <Button variant="outline" size="lg" onClick={reset} className="gap-2">
-                <RotateCcw className="h-4 w-4" /> New JD
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => downloadReportPDF(results.map((r) => ({ name: r.name, result: r.result })), lockedCriteria)}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" /> PDF Download
-              </Button>
-            </div>
-          </div>
+                <div className="space-y-10">
+                  {results.map((r, i) => (
+                    <div key={r.id} className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                            {i + 1}
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-widest text-muted-foreground">Candidate {i + 1} of {results.length}</div>
+                            <div className="text-sm font-semibold">{r.name}</div>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-[11px]">
+                          Score {Math.round(r.result.match_score)} / 100
+                        </Badge>
+                      </div>
+                      <Report result={r.result} resume={r.resume} jd={jd} criteria={lockedCriteria} />
+                      {i < results.length - 1 && <Separator className="my-6" />}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => { setResumes([]); setResults([]); setError(null); setStep(3); }}
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4" /> Analyze more resumes
+                  </Button>
+                  <Button variant="outline" size="lg" onClick={reset} className="gap-2">
+                    <RotateCcw className="h-4 w-4" /> New JD
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => downloadReportPDF(results.map((r) => ({ name: r.name, result: r.result })), lockedCriteria)}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" /> PDF Download
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
