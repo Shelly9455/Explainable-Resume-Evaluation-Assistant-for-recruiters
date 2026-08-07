@@ -27,6 +27,8 @@ import {
   Shield, Target, Scale, AlertOctagon, Brain, MessageSquareQuote, Calculator,
   ArrowRight, ArrowLeft, Upload, Lock, Plus, Trash2, RotateCcw, Wand2, ThumbsUp, ThumbsDown, Clock,
 } from "lucide-react";
+import { Download } from "lucide-react";
+import { downloadReportPDF } from "@/lib/report-pdf";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -230,6 +232,14 @@ function Index() {
               </Button>
               <Button variant="outline" size="lg" onClick={reset} className="gap-2">
                 <RotateCcw className="h-4 w-4" /> New JD
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => downloadReportPDF(results.map((r) => ({ name: r.name, result: r.result })), lockedCriteria)}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" /> PDF Report
               </Button>
             </div>
           </div>
