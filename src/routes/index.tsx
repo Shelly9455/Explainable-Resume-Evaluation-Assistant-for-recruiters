@@ -22,13 +22,14 @@ import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { extractFileText } from "@/lib/pdf-extract";
+import { Download } from "lucide-react";
+import { downloadReportPDF } from "@/lib/report-pdf";
+import logo from "@/assets/lucid-hire-logo.png";
 import {
   FileText, Sparkles, Loader2, CheckCircle2, AlertTriangle, XCircle,
   Shield, Target, Scale, AlertOctagon, Brain, MessageSquareQuote, Calculator,
   ArrowRight, ArrowLeft, Upload, Lock, Plus, Trash2, RotateCcw, Wand2, ThumbsUp, ThumbsDown, Clock,
 } from "lucide-react";
-import { Download } from "lucide-react";
-import { downloadReportPDF } from "@/lib/report-pdf";
 
 export const Route = createFileRoute("/")({
   head: () => ({
