@@ -32,7 +32,7 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Lucid Hire — Explainable Resume Evaluation" },
-      { name: "description", content: "Recruiter-configured, evidence-based AI resume evaluation. Customize rubric and weightages, then evaluate candidates." },
+      { name: "description", content: "Recruiter-configured, evidence-based AI resume evaluation. Customize metrics and weightages, then evaluate candidates." },
     ],
   }),
   component: Index,

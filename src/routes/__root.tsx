@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Lucid Hire — Explainable Resume Evaluation" },
+      { name: "description", content: "Recruiter-configured, evidence-based AI resume evaluation. Customize metrics and weightages, then evaluate candidates." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Lucid Hire — Explainable Resume Evaluation" },
+      { property: "og:description", content: "Recruiter-configured, evidence-based AI resume evaluation. Customize metrics and weightages, then evaluate candidates." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Lucid Hire — Explainable Resume Evaluation" },
+      { name: "twitter:description", content: "Recruiter-configured, evidence-based AI resume evaluation. Customize metrics and weightages, then evaluate candidates." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/32c2f49ca9c99f434a74dd71b3af5444/id-preview-5a08811c--1d36ec25-42ae-485c-90aa-9eb05854a7d2.lovable.app-1786085578416.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/32c2f49ca9c99f434a74dd71b3af5444/id-preview-5a08811c--1d36ec25-42ae-485c-90aa-9eb05854a7d2.lovable.app-1786085578416.png" },
     ],
     links: [
       {
