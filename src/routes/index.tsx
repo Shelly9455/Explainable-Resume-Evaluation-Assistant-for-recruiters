@@ -22,13 +22,14 @@ import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { extractFileText } from "@/lib/pdf-extract";
+import { Download } from "lucide-react";
+import { downloadReportPDF } from "@/lib/report-pdf";
+import logo from "@/assets/lucid-hire-logo.png";
 import {
   FileText, Sparkles, Loader2, CheckCircle2, AlertTriangle, XCircle,
   Shield, Target, Scale, AlertOctagon, Brain, MessageSquareQuote, Calculator,
   ArrowRight, ArrowLeft, Upload, Lock, Plus, Trash2, RotateCcw, Wand2, ThumbsUp, ThumbsDown, Clock,
 } from "lucide-react";
-import { Download } from "lucide-react";
-import { downloadReportPDF } from "@/lib/report-pdf";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -67,6 +68,8 @@ interface ResumeResult {
 }
 
 function Index() {
+  const [started, setStarted] = useState(false);
+  const [mode, setMode] = useState<"recruiter" | "seeker" | null>(null);
   const [step, setStep] = useState<Step>(1);
 
   const [jd, setJd] = useState("");
@@ -148,103 +151,188 @@ function Index() {
     <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">
-        <Stepper current={step} />
-
-        {error && (
-          <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        {step === 1 && (
-          <Step1
-            jd={jd} setJd={setJd}
-            loading={loading} onNext={onAnalyzeJD}
+        {!started ? (
+          <Landing
+            onStart={(m) => { setMode(m); setStarted(true); }}
           />
-        )}
+        ) : (
+          <>
+            <Stepper current={step} />
 
-        {step === 2 && analysis && (
-          <Step2
-            analysis={analysis}
-            guardrails={guardrails} setGuardrails={setGuardrails}
-            weights={weights} setWeights={setWeights}
-            criticalReqs={criticalReqs} setCriticalReqs={setCriticalReqs}
-            totalWeight={totalWeight}
-            approvedGuardrails={activeGuardrails}
-            approvedCriticals={approvedCriticals}
-            pendingReview={pendingReview}
-            onBack={() => setStep(1)}
-            onLock={() => setStep(3)}
-          />
-        )}
+            {error && (
+              <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
 
-        {step === 3 && (
-          <Step3
-            resumes={resumes} setResumes={setResumes}
-            activeGuardrails={activeGuardrails}
-            weights={weights}
-            criticalCount={approvedCriticals}
-            loading={loading}
-            progress={evalProgress}
-            onBack={() => setStep(2)}
-            onEvaluate={onEvaluate}
-          />
-        )}
+            {step === 1 && (
+              <Step1
+                jd={jd} setJd={setJd}
+                loading={loading} onNext={onAnalyzeJD}
+              />
+            )}
 
-        {step === 4 && results.length > 0 && (
-          <div>
-            <div className="mb-6 flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="gap-2">
-                <ArrowLeft className="h-4 w-4" /> Back to resumes
-              </Button>
-              <div />
-            </div>
-            <div className="space-y-10">
-              {results.map((r, i) => (
-                <div key={r.id} className="space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                        {i + 1}
-                      </span>
-                      <div>
-                        <div className="text-xs uppercase tracking-widest text-muted-foreground">Candidate {i + 1} of {results.length}</div>
-                        <div className="text-sm font-semibold">{r.name}</div>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="text-[11px]">
-                      Score {Math.round(r.result.match_score)} / 100
-                    </Badge>
-                  </div>
-                  <Report result={r.result} resume={r.resume} jd={jd} criteria={lockedCriteria} />
-                  {i < results.length - 1 && <Separator className="my-6" />}
+            {step === 2 && analysis && (
+              <Step2
+                analysis={analysis}
+                guardrails={guardrails} setGuardrails={setGuardrails}
+                weights={weights} setWeights={setWeights}
+                criticalReqs={criticalReqs} setCriticalReqs={setCriticalReqs}
+                totalWeight={totalWeight}
+                approvedGuardrails={activeGuardrails}
+                approvedCriticals={approvedCriticals}
+                pendingReview={pendingReview}
+                onBack={() => setStep(1)}
+                onLock={() => setStep(3)}
+              />
+            )}
+
+            {step === 3 && (
+              <Step3
+                resumes={resumes} setResumes={setResumes}
+                activeGuardrails={activeGuardrails}
+                weights={weights}
+                criticalCount={approvedCriticals}
+                loading={loading}
+                progress={evalProgress}
+                onBack={() => setStep(2)}
+                onEvaluate={onEvaluate}
+              />
+            )}
+
+            {step === 4 && results.length > 0 && (
+              <div>
+                <div className="mb-6 flex items-center justify-between">
+                  <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="gap-2">
+                    <ArrowLeft className="h-4 w-4" /> Back to resumes
+                  </Button>
+                  <div />
                 </div>
-              ))}
-            </div>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-              <Button
-                variant="default"
-                size="lg"
-                onClick={() => { setResumes([]); setResults([]); setError(null); setStep(3); }}
-                className="gap-2"
-              >
-                <FileText className="h-4 w-4" /> Analyze more resumes
-              </Button>
-              <Button variant="outline" size="lg" onClick={reset} className="gap-2">
-                <RotateCcw className="h-4 w-4" /> New JD
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => downloadReportPDF(results.map((r) => ({ name: r.name, result: r.result })), lockedCriteria)}
-                className="gap-2"
-              >
-                <Download className="h-4 w-4" /> PDF Download
-              </Button>
-            </div>
-          </div>
+                <div className="space-y-10">
+                  {results.map((r, i) => (
+                    <div key={r.id} className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                            {i + 1}
+                          </span>
+                          <div>
+                            <div className="text-xs uppercase tracking-widest text-muted-foreground">Candidate {i + 1} of {results.length}</div>
+                            <div className="text-sm font-semibold">{r.name}</div>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-[11px]">
+                          Score {Math.round(r.result.match_score)} / 100
+                        </Badge>
+                      </div>
+                      <Report result={r.result} resume={r.resume} jd={jd} criteria={lockedCriteria} />
+                      {i < results.length - 1 && <Separator className="my-6" />}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => { setResumes([]); setResults([]); setError(null); setStep(3); }}
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4" /> Analyze more resumes
+                  </Button>
+                  <Button variant="outline" size="lg" onClick={reset} className="gap-2">
+                    <RotateCcw className="h-4 w-4" /> New JD
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => downloadReportPDF(results.map((r) => ({ name: r.name, result: r.result })), lockedCriteria)}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" /> PDF Download
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
+    </div>
+  );
+}
+
+/* ============================ LANDING ============================ */
+
+function Landing({ onStart }: { onStart: (mode: "recruiter" | "seeker") => void }) {
+  return (
+    <div className="relative overflow-hidden">
+      {/* Ambient gradient blobs */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full blur-3xl"
+             style={{ background: "radial-gradient(circle, rgba(37,99,235,0.22), transparent 70%)" }} />
+        <div className="absolute right-0 top-40 h-64 w-64 rounded-full blur-3xl"
+             style={{ background: "radial-gradient(circle, rgba(13,148,136,0.18), transparent 70%)" }} />
+        <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full blur-3xl"
+             style={{ background: "radial-gradient(circle, rgba(37,99,235,0.12), transparent 70%)" }} />
+      </div>
+
+      <div className="flex flex-col items-center pt-12 text-center sm:pt-20">
+        <div className="glass neuro relative flex h-20 w-20 items-center justify-center rounded-2xl p-2 shadow-[var(--shadow-elevated)]">
+          <img src={logo} alt="Lucid Hire logo" width={72} height={72} className="h-16 w-16 rounded-xl object-contain" />
+        </div>
+
+        <h1 className="mt-6 text-4xl font-extrabold tracking-tight sm:text-5xl">
+          <span className="bg-clip-text text-transparent"
+                style={{ backgroundImage: "var(--gradient-primary)" }}>Lucid Hire</span>
+        </h1>
+
+        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+          Evaluate how well a resume matches a job description using a recruiter-style scoring tool.
+        </p>
+
+        <div className="mt-12 grid w-full max-w-3xl gap-5 sm:grid-cols-2">
+          {/* Recruiter */}
+          <button
+            onClick={() => onStart("recruiter")}
+            className="glass neuro group flex flex-col items-start rounded-2xl border border-primary/25 p-6 text-left transition-all hover:-translate-y-1 hover:shadow-[var(--shadow-elevated)]"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl text-primary-foreground"
+                 style={{ background: "var(--gradient-primary)" }}>
+              <Shield className="h-5 w-5" />
+            </div>
+            <span className="mt-4 text-lg font-bold">I&apos;m a Recruiter</span>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Upload a JD and resume to get an evaluation.
+            </p>
+            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+              Get started <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </span>
+          </button>
+
+          {/* Job Seeker */}
+          <button
+            onClick={() => onStart("seeker")}
+            className="glass neuro group flex flex-col items-start rounded-2xl border border-teal-500/25 p-6 text-left transition-all hover:-translate-y-1 hover:shadow-[var(--shadow-elevated)]"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white"
+                 style={{ background: "linear-gradient(135deg, #0D9488, #0F766E)" }}>
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <span className="mt-4 text-lg font-bold">I&apos;m a Job Seeker</span>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Check how a recruiter is likely to evaluate your resume against a JD.
+            </p>
+            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-teal-600">
+              Get started <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </span>
+          </button>
+        </div>
+
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-primary" /> Explainable scoring</span>
+          <span className="inline-flex items-center gap-1.5"><Scale className="h-3.5 w-3.5 text-primary" /> Recruiter-controlled rubric</span>
+          <span className="inline-flex items-center gap-1.5"><Brain className="h-3.5 w-3.5 text-primary" /> AI-assisted, evidence-based</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -256,10 +344,7 @@ function Header() {
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground"
-               style={{ background: "var(--gradient-primary)" }}>
-            <Sparkles className="h-4 w-4" />
-          </div>
+          <img src={logo} alt="Lucid Hire" width={28} height={28} className="h-7 w-7 rounded-md object-contain" />
           <span className="text-sm font-semibold tracking-tight">Lucid Hire</span>
           <Badge variant="secondary" className="ml-1 text-[10px]">Beta</Badge>
         </div>
