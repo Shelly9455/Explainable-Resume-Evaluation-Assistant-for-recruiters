@@ -195,19 +195,7 @@ function Index() {
               <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="gap-2">
                 <ArrowLeft className="h-4 w-4" /> Back to resumes
               </Button>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => { setResumes([]); setResults([]); setError(null); setStep(3); }}
-                  className="gap-2"
-                >
-                  <FileText className="h-4 w-4" /> Analyze more resumes
-                </Button>
-                <Button variant="outline" size="sm" onClick={reset} className="gap-2">
-                  <RotateCcw className="h-4 w-4" /> New JD
-                </Button>
-              </div>
+              <div />
             </div>
             <div className="space-y-10">
               {results.map((r, i) => (
