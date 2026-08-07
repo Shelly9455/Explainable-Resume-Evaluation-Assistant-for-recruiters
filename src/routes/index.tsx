@@ -239,7 +239,7 @@ function Index() {
                 onClick={() => downloadReportPDF(results.map((r) => ({ name: r.name, result: r.result })), lockedCriteria)}
                 className="gap-2"
               >
-                <Download className="h-4 w-4" /> PDF Report
+                <Download className="h-4 w-4" /> PDF Download
               </Button>
             </div>
           </div>
