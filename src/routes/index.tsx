@@ -260,6 +260,83 @@ function Index() {
   );
 }
 
+/* ============================ LANDING ============================ */
+
+function Landing({ onStart }: { onStart: (mode: "recruiter" | "seeker") => void }) {
+  return (
+    <div className="relative overflow-hidden">
+      {/* Ambient gradient blobs */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full blur-3xl"
+             style={{ background: "radial-gradient(circle, rgba(37,99,235,0.22), transparent 70%)" }} />
+        <div className="absolute right-0 top-40 h-64 w-64 rounded-full blur-3xl"
+             style={{ background: "radial-gradient(circle, rgba(13,148,136,0.18), transparent 70%)" }} />
+        <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full blur-3xl"
+             style={{ background: "radial-gradient(circle, rgba(37,99,235,0.12), transparent 70%)" }} />
+      </div>
+
+      <div className="flex flex-col items-center pt-12 text-center sm:pt-20">
+        <div className="glass neuro relative flex h-20 w-20 items-center justify-center rounded-2xl p-2 shadow-[var(--shadow-elevated)]">
+          <img src={logo} alt="Lucid Hire logo" width={72} height={72} className="h-16 w-16 rounded-xl object-contain" />
+        </div>
+
+        <h1 className="mt-6 text-4xl font-extrabold tracking-tight sm:text-5xl">
+          <span className="bg-clip-text text-transparent"
+                style={{ backgroundImage: "var(--gradient-primary)" }}>Lucid Hire</span>
+        </h1>
+
+        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+          Evaluate how well a resume matches a job description using a recruiter-style scoring tool.
+        </p>
+
+        <div className="mt-12 grid w-full max-w-3xl gap-5 sm:grid-cols-2">
+          {/* Recruiter */}
+          <button
+            onClick={() => onStart("recruiter")}
+            className="glass neuro group flex flex-col items-start rounded-2xl border border-primary/25 p-6 text-left transition-all hover:-translate-y-1 hover:shadow-[var(--shadow-elevated)]"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl text-primary-foreground"
+                 style={{ background: "var(--gradient-primary)" }}>
+              <Shield className="h-5 w-5" />
+            </div>
+            <span className="mt-4 text-lg font-bold">I&apos;m a Recruiter</span>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Upload a JD and resume to get an evaluation.
+            </p>
+            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
+              Get started <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </span>
+          </button>
+
+          {/* Job Seeker */}
+          <button
+            onClick={() => onStart("seeker")}
+            className="glass neuro group flex flex-col items-start rounded-2xl border border-teal-500/25 p-6 text-left transition-all hover:-translate-y-1 hover:shadow-[var(--shadow-elevated)]"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white"
+                 style={{ background: "linear-gradient(135deg, #0D9488, #0F766E)" }}>
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <span className="mt-4 text-lg font-bold">I&apos;m a Job Seeker</span>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Check how a recruiter is likely to evaluate your resume against a JD.
+            </p>
+            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-teal-600">
+              Get started <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </span>
+          </button>
+        </div>
+
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-primary" /> Explainable scoring</span>
+          <span className="inline-flex items-center gap-1.5"><Scale className="h-3.5 w-3.5 text-primary" /> Recruiter-controlled rubric</span>
+          <span className="inline-flex items-center gap-1.5"><Brain className="h-3.5 w-3.5 text-primary" /> AI-assisted, evidence-based</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ============================ HEADER & STEPPER ============================ */
 
 function Header() {
