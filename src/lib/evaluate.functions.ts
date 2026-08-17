@@ -222,8 +222,8 @@ function toFriendlyGroqError(status: number, text: string) {
 }
 
 async function callGroq(system: string, user: string, options: GroqCallOptions) {
-  const groqKey = process.env.GROQ_API_KEY;
-  if (!groqKey) throw new Error("GROQ_API_KEY is not configured.");
+  const aiKey = process.env.LOVABLE_API_KEY;
+  if (!aiKey) throw new Error("AI gateway key is not configured.");
 
   const trimmedUser =
     user.length > options.maxUserChars
@@ -232,13 +232,12 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
 
   const retries = options.retries ?? 1;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${groqKey}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiKey}` },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "google/gemini-2.5-flash",
         temperature: options.temperature ?? 0.1,
-        seed: options.seed,
         max_tokens: options.maxTokens,
         response_format: { type: "json_object" },
         messages: [
