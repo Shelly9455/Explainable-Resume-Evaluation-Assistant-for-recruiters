@@ -76,6 +76,7 @@ export interface EvaluationResult {
 /* ============================== GROQ ============================== */
 
 type GroqCallOptions = {
+  /** options for a gateway chat call */
   maxTokens: number;
   maxUserChars: number;
   retries?: number;
@@ -222,6 +223,32 @@ function toFriendlyGroqError(status: number, text: string) {
   return `AI provider error ${status}: ${text.slice(0, 240)}`;
 }
 
+function repairJson(input: string) {
+  let text = input.trim();
+  text = text.replace(/,\s*$/, "");
+  let inString = false;
+  let escaped = false;
+  const stack: string[] = [];
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{" || ch === "[") stack.push(ch);
+    else if (ch === "}" || ch === "]") stack.pop();
+  }
+  if (inString) text += '"';
+  text = text.replace(/,\s*$/, "");
+  while (stack.length) {
+    const open = stack.pop();
+    text += open === "{" ? "}" : "]";
+  }
+  return text;
+}
+
 async function callGroq(system: string, user: string, options: GroqCallOptions) {
   const aiKey = process.env.LOVABLE_API_KEY;
   if (!aiKey) throw new Error("AI gateway key is not configured.");
@@ -252,13 +279,15 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
     if (res.ok) {
       const payload = (await res.json()) as { choices: { finish_reason?: string; message: { content: string } }[] };
       const choice = payload.choices?.[0];
-      if (choice?.finish_reason === "length") {
-        throw new Error("The AI response was cut off before the evaluation JSON could finish.");
-      }
       const raw = choice?.message?.content ?? "";
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Model did not return JSON.");
-      return JSON.parse(jsonMatch[0]);
+      const start = raw.indexOf("{");
+      if (start === -1) throw new Error("Model did not return JSON.");
+      const candidate = raw.slice(start);
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        return JSON.parse(repairJson(candidate));
+      }
     }
 
     const text = await res.text();
@@ -324,7 +353,7 @@ export const analyzeJD = createServerFn({ method: "POST" })
     const out = await callGroq(
       ANALYZE_SYSTEM,
       `JOB DESCRIPTION:\n${truncateText(data.jd, 9000)}\n\nReturn the JSON object now.`,
-      { maxTokens: 3000, maxUserChars: 10000, retries: 1, temperature: 0, seed: 42 },
+      { maxTokens: 6000, maxUserChars: 10000, retries: 1, temperature: 0, seed: 42 },
     );
     const analysis = out as JDAnalysis;
     analyzeCache.set(cacheKey, analysis);
