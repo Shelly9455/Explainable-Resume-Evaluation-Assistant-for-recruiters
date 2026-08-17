@@ -223,6 +223,7 @@ function toFriendlyGroqError(status: number, text: string) {
 }
 
 async function callGroq(system: string, user: string, options: GroqCallOptions) {
+  void 0;
   const aiKey = process.env.LOVABLE_API_KEY;
   if (!aiKey) throw new Error("AI gateway key is not configured.");
 
