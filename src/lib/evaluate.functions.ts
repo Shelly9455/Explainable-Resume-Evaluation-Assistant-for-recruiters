@@ -395,6 +395,33 @@ export const analyzeJD = createServerFn({ method: "POST" })
     const rawWeights = Array.isArray(partial.recommended_weightages)
       ? partial.recommended_weightages
       : [];
+    const weightDefaults: Record<string, { label: string; rationale: string; weight: number }> = {
+      skills_match: {
+        label: "Core skills and tools required by the role",
+        rationale: "Baseline capability — the candidate must be able to do the day-to-day work.",
+        weight: 25,
+      },
+      experience_match: {
+        label: "Years and depth of directly relevant experience",
+        rationale: "Signals how quickly the candidate can operate without ramp-up support.",
+        weight: 25,
+      },
+      domain_relevance: {
+        label: "Industry or domain context of past work",
+        rationale: "Domain familiarity shortens onboarding and reduces context-switching risk.",
+        weight: 20,
+      },
+      critical_requirements: {
+        label: "Non-negotiable requirements stated in the JD",
+        rationale: "Missing any of these makes the profile unfit regardless of other strengths.",
+        weight: 20,
+      },
+      risk_factors: {
+        label: "Gaps, job-hopping, or unverified claims",
+        rationale: "Flags risks a recruiter would probe before advancing the candidate.",
+        weight: 10,
+      },
+    };
     const analysis: JDAnalysis = {
       ...(partial as JDAnalysis),
       role_summary: partial.role_summary ?? "",
@@ -409,12 +436,13 @@ export const analyzeJD = createServerFn({ method: "POST" })
         : [],
       recommended_weightages: weightKeys.map((key, i) => {
         const found = rawWeights.find((w) => w?.key === key);
+        const fallback = weightDefaults[key]!;
         return {
           key,
           guardrail_requirement:
-            found?.guardrail_requirement || key.replace(/_/g, " "),
-          weight: typeof found?.weight === "number" ? found.weight : 20,
-          rationale: found?.rationale || "",
+            found?.guardrail_requirement?.trim() || fallback.label,
+          weight: typeof found?.weight === "number" ? found.weight : fallback.weight,
+          rationale: found?.rationale?.trim() || fallback.rationale,
         } as JDAnalysis["recommended_weightages"][number];
       }),
     };
