@@ -1103,6 +1103,11 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
 
       <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Deeper Interview Intelligence" full>
         <div className="space-y-3">
+          {seeker && (
+            <p className="text-xs text-muted-foreground">
+              Review likely interview questions, along with examples of strong and risky answers, to prepare for what you may be asked.
+            </p>
+          )}
           {(result.interview_questions || []).map((q, i) => (
             <details key={i} className="group rounded-lg border border-border/60 bg-card px-4 py-3 open:shadow-[var(--shadow-card)]">
               <summary className="flex cursor-pointer items-start justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
