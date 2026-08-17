@@ -260,8 +260,12 @@ function Index() {
         )}
       </main>
     </div>
+    </SeekerCtx.Provider>
   );
 }
+
+const SeekerCtx = createContext(false);
+const useSeeker = () => useContext(SeekerCtx);
 
 /* ============================ LANDING ============================ */
 
