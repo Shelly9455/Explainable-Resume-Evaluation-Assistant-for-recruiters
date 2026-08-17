@@ -766,6 +766,7 @@ function Step3({
 }) {
   const [pasted, setPasted] = useState("");
   const [reading, setReading] = useState(false);
+  const seeker = useSeeker();
 
   const onFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -971,6 +972,7 @@ function EditableFieldBlock({ tone, label, value, onChange, placeholder }: {
 /* ============================ REPORT (STEP 4) ============================ */
 
 function Report({ result, resume, jd, criteria }: { result: EvaluationResult; resume: string; jd: string; criteria: LockedCriteria }) {
+  const seeker = useSeeker();
   const kw = useMemo(
     () => {
       const BANNED = new Set([
@@ -1175,6 +1177,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
 }
 
 function DecisionHero({ result }: { result: EvaluationResult }) {
+  const seeker = useSeeker();
   const meta = decisionMeta(result.decision);
   const score = Math.max(0, Math.min(100, Math.round(result.match_score)));
   return (
