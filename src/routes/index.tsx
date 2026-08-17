@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { track } from "@/lib/analytics-track";
 import {
@@ -148,6 +148,7 @@ function Index() {
   };
 
   return (
+    <SeekerCtx.Provider value={mode === "seeker"}>
     <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">
