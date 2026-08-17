@@ -543,13 +543,11 @@ function Step2({
       </SectionCard>
 
       <SectionCard icon={<Target className="h-4 w-4" />} title="Suggested Guardrails"
+        subtitle="Review each suggestion and Approve or Reject it. You can also Edit, Add, or Remove guardrails. Approve minimum 3 guardrails to continue."
         action={<Button variant="outline" size="sm" onClick={addGuardrail} className="gap-2">
           <Plus className="h-3.5 w-3.5" /> Add guardrail
         </Button>}>
         <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Review the suggested guardrails, then edit, add, or remove any requirement before approving or rejecting each guardrail.
-          </p>
           {guardrails.map((g) => (
             <div key={g.id} className={`rounded-lg border bg-card p-3 ${
               g.status === "approved" ? "border-[oklch(0.62_0.16_155/0.45)]" :
@@ -895,17 +893,22 @@ function Step3({
 
 /* ============================ SHARED ============================ */
 
-function SectionCard({ icon, title, children, action }: {
-  icon: React.ReactNode; title: string; children: React.ReactNode; action?: React.ReactNode;
+function SectionCard({ icon, title, children, action, subtitle }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode; action?: React.ReactNode; subtitle?: string;
 }) {
   return (
     <Card className="overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-muted/30 px-5 py-3 text-sm font-semibold">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</span>
-          {title}
+      <div className="border-b border-border/70 bg-muted/30 px-5 py-3">
+        <div className="flex items-center justify-between gap-2 text-sm font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</span>
+            {title}
+          </div>
+          {action}
         </div>
-        {action}
+        {subtitle ? (
+          <p className="mt-2 text-xs font-normal text-muted-foreground">{subtitle}</p>
+        ) : null}
       </div>
       <div className="p-5">{children}</div>
     </Card>
