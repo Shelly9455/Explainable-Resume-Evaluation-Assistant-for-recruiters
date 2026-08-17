@@ -81,6 +81,7 @@ type GroqCallOptions = {
   retries?: number;
   temperature?: number;
   seed?: number;
+  model?: string;
 };
 
 type EvaluationItem = {
