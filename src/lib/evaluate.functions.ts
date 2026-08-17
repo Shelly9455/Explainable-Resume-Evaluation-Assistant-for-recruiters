@@ -237,7 +237,8 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${aiKey}` },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: options.model ?? "google/gemini-2.5-flash-lite",
+        reasoning_effort: "none",
         temperature: options.temperature ?? 0.1,
         max_tokens: options.maxTokens,
         response_format: { type: "json_object" },
