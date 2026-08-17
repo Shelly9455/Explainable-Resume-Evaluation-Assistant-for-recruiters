@@ -320,7 +320,7 @@ export const analyzeJD = createServerFn({ method: "POST" })
     if (cached) return cached;
     const out = await callGroq(
       ANALYZE_SYSTEM,
-      `JOB DESCRIPTION:\n${truncateText(data.jd, 2800)}\n\nReturn the JSON object now.`,
+      `JOB DESCRIPTION:\n${truncateText(data.jd, 20000)}\n\nReturn the JSON object now.`,
       { maxTokens: 8000, maxUserChars: 24000, retries: 1, temperature: 0, seed: 42 },
     );
     const analysis = out as JDAnalysis;
