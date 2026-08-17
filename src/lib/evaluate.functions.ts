@@ -283,7 +283,7 @@ const ANALYZE_SYSTEM = `You are an Explainable Hiring Rubric Designer. Given ONL
 
 1. A concise role summary (2-3 sentences).
 2. Critical (non-negotiable) requirements. For each: a short "requirement" string, a 1-sentence "why_critical" explanation, and a 1-sentence "impact" describing how missing it changes the hiring decision.
-3. 5-8 suggested guardrails. For each: a name (3-6 words), a 1-2 sentence explanation, importance (High|Medium|Low), a "reason" (why this guardrail matters for THIS role), and a "risk_if_ignored" (what could go wrong if it is skipped).
+3. 4-6 suggested guardrails. For each: a name (3-6 words), a ONE-sentence explanation, importance (High|Medium|Low), a one-sentence "reason" (why this guardrail matters for THIS role), and a one-sentence "risk_if_ignored" (what could go wrong if it is skipped).
 4. Recommended evaluation weightages across these FIVE fixed buckets (must sum to exactly 100):
    - skills_match
    - experience_match
@@ -309,7 +309,8 @@ Return STRICT JSON ONLY, no markdown:
 Rules:
 - Weightages MUST sum to exactly 100.
 - Use evidence from the JD only; never invent requirements.
-- Guardrail IDs are short slugs like "g1", "g2", ...`;
+- Guardrail IDs are short slugs like "g1", "g2", ...
+- Keep every string short and specific; no filler.`;
 
 export const analyzeJD = createServerFn({ method: "POST" })
   .inputValidator((data: { jd: string }) => {
@@ -322,8 +323,8 @@ export const analyzeJD = createServerFn({ method: "POST" })
     if (cached) return cached;
     const out = await callGroq(
       ANALYZE_SYSTEM,
-      `JOB DESCRIPTION:\n${truncateText(data.jd, 20000)}\n\nReturn the JSON object now.`,
-      { maxTokens: 8000, maxUserChars: 24000, retries: 1, temperature: 0, seed: 42 },
+      `JOB DESCRIPTION:\n${truncateText(data.jd, 9000)}\n\nReturn the JSON object now.`,
+      { maxTokens: 3000, maxUserChars: 10000, retries: 1, temperature: 0, seed: 42 },
     );
     const analysis = out as JDAnalysis;
     analyzeCache.set(cacheKey, analysis);
