@@ -830,16 +830,20 @@ function Step3({
       </Card>
 
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload candidate resumes</h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          {seeker ? "Upload your resume" : "Upload candidate resumes"}
+        </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Add one or many resumes — each is evaluated against your locked criteria and shown one after the other.
+          {seeker
+            ? "Add your resume — which will be evaluated against your locked criteria."
+            : "Add one or many resumes — each is evaluated against your locked criteria and shown one after the other."}
         </p>
       </div>
 
       <Card className="overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)]">
         <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-muted/40 px-4 py-2.5">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <FileText className="h-4 w-4" /> Candidate Resumes
+            <FileText className="h-4 w-4" /> {seeker ? "Your Resume" : "Candidate Resumes"}
             {resumes.length > 0 && (
               <Badge variant="secondary" className="text-[10px]">{resumes.length} loaded</Badge>
             )}
@@ -1060,7 +1064,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
     <div className="space-y-6">
       <DecisionHero result={result} />
 
-      <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary" full>
+      <ReportCard icon={<FileText className="h-4 w-4" />} title={seeker ? "Resume Summary" : "Candidate Summary"} full>
         <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
           <p>
             <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
@@ -1179,7 +1183,7 @@ function DecisionHero({ result }: { result: EvaluationResult }) {
         <div className="flex flex-wrap items-start justify-between gap-6 text-primary-foreground">
           <div className="max-w-2xl">
             <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest opacity-80">
-              <Shield className="h-3.5 w-3.5" /> Candidate Snapshot
+              <Shield className="h-3.5 w-3.5" /> {seeker ? "Resume Snapshot" : "Candidate Snapshot"}
             </div>
             <div className="flex items-center gap-3">
               <meta.Icon className="h-7 w-7" />
