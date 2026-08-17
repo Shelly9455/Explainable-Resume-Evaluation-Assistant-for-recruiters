@@ -605,6 +605,7 @@ function Step2({
       </SectionCard>
 
       <SectionCard icon={<Scale className="h-4 w-4" />} title="Recommended Evaluation Weightages"
+        subtitle="You can also Edit, Add or Reset any weightages."
         action={<div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={addWeight} className="gap-2">
             <Plus className="h-3.5 w-3.5" /> Add bucket
