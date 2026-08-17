@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { track } from "@/lib/analytics-track";
 import {
@@ -148,6 +148,7 @@ function Index() {
   };
 
   return (
+    <SeekerCtx.Provider value={mode === "seeker"}>
     <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">
@@ -259,8 +260,12 @@ function Index() {
         )}
       </main>
     </div>
+    </SeekerCtx.Provider>
   );
 }
+
+const SeekerCtx = createContext(false);
+const useSeeker = () => useContext(SeekerCtx);
 
 /* ============================ LANDING ============================ */
 
@@ -393,6 +398,7 @@ function Stepper({ current }: { current: Step }) {
 function Step1({ jd, setJd, loading, onNext }: {
   jd: string; setJd: (v: string) => void; loading: boolean; onNext: () => void;
 }) {
+  const seeker = useSeeker();
   const onFile = async (f: File | null) => {
     if (!f) return;
     const text = await extractFileText(f);
@@ -404,7 +410,9 @@ function Step1({ jd, setJd, loading, onNext }: {
         <Badge variant="secondary" className="mb-3 gap-1"><Shield className="h-3 w-3" /> Step 1 of 4</Badge>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload your job description</h1>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          We'll derive a transparent hiring rubric you can review and customize before any candidate is evaluated.
+          {seeker
+            ? "We'll derive transparent evaluation criteria from the job description."
+            : "We'll derive a transparent hiring rubric you can review and customize before any candidate is evaluated."}
         </p>
       </div>
 
@@ -758,6 +766,7 @@ function Step3({
 }) {
   const [pasted, setPasted] = useState("");
   const [reading, setReading] = useState(false);
+  const seeker = useSeeker();
 
   const onFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -822,16 +831,20 @@ function Step3({
       </Card>
 
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload candidate resumes</h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          {seeker ? "Upload your resume" : "Upload candidate resumes"}
+        </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          Add one or many resumes — each is evaluated against your locked criteria and shown one after the other.
+          {seeker
+            ? "Add your resume — which will be evaluated against your locked criteria."
+            : "Add one or many resumes — each is evaluated against your locked criteria and shown one after the other."}
         </p>
       </div>
 
       <Card className="overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)]">
         <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-muted/40 px-4 py-2.5">
           <div className="flex items-center gap-2 text-sm font-medium">
-            <FileText className="h-4 w-4" /> Candidate Resumes
+            <FileText className="h-4 w-4" /> {seeker ? "Your Resume" : "Candidate Resumes"}
             {resumes.length > 0 && (
               <Badge variant="secondary" className="text-[10px]">{resumes.length} loaded</Badge>
             )}
@@ -959,6 +972,7 @@ function EditableFieldBlock({ tone, label, value, onChange, placeholder }: {
 /* ============================ REPORT (STEP 4) ============================ */
 
 function Report({ result, resume, jd, criteria }: { result: EvaluationResult; resume: string; jd: string; criteria: LockedCriteria }) {
+  const seeker = useSeeker();
   const kw = useMemo(
     () => {
       const BANNED = new Set([
@@ -1052,7 +1066,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
     <div className="space-y-6">
       <DecisionHero result={result} />
 
-      <ReportCard icon={<FileText className="h-4 w-4" />} title="Candidate Summary" full>
+      <ReportCard icon={<FileText className="h-4 w-4" />} title={seeker ? "Resume Summary" : "Candidate Summary"} full>
         <div className="space-y-3 text-sm leading-relaxed text-foreground/90">
           <p>
             <HL text={result.candidate_summary} keywords={kw} matched={matchedSet} missing={missingSet} />
@@ -1089,6 +1103,11 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
 
       <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Deeper Interview Intelligence" full>
         <div className="space-y-3">
+          {seeker && (
+            <p className="text-xs text-muted-foreground">
+              Review likely interview questions, along with examples of strong and risky answers, to prepare for what you may be asked.
+            </p>
+          )}
           {(result.interview_questions || []).map((q, i) => (
             <details key={i} className="group rounded-lg border border-border/60 bg-card px-4 py-3 open:shadow-[var(--shadow-card)]">
               <summary className="flex cursor-pointer items-start justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
@@ -1163,6 +1182,7 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
 }
 
 function DecisionHero({ result }: { result: EvaluationResult }) {
+  const seeker = useSeeker();
   const meta = decisionMeta(result.decision);
   const score = Math.max(0, Math.min(100, Math.round(result.match_score)));
   return (
@@ -1171,7 +1191,7 @@ function DecisionHero({ result }: { result: EvaluationResult }) {
         <div className="flex flex-wrap items-start justify-between gap-6 text-primary-foreground">
           <div className="max-w-2xl">
             <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest opacity-80">
-              <Shield className="h-3.5 w-3.5" /> Candidate Snapshot
+              <Shield className="h-3.5 w-3.5" /> {seeker ? "Resume Snapshot" : "Candidate Snapshot"}
             </div>
             <div className="flex items-center gap-3">
               <meta.Icon className="h-7 w-7" />
