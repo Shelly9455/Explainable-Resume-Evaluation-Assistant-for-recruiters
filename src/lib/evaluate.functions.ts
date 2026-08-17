@@ -76,6 +76,7 @@ export interface EvaluationResult {
 /* ============================== GROQ ============================== */
 
 type GroqCallOptions = {
+  /** options for a gateway chat call */
   maxTokens: number;
   maxUserChars: number;
   retries?: number;
