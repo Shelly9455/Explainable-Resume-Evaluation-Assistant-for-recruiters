@@ -408,7 +408,7 @@ function Step1({ jd, setJd, loading, onNext }: {
     <div className="mt-8">
       <div className="text-center">
         <Badge variant="secondary" className="mb-3 gap-1"><Shield className="h-3 w-3" /> Step 1 of 4</Badge>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload your job description</h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload the job description</h1>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
           {seeker
             ? "We'll derive transparent evaluation criteria from the job description."
@@ -1101,13 +1101,13 @@ function Report({ result, resume, jd, criteria }: { result: EvaluationResult; re
         </ReportCard>
       </SectionGrid>
 
-      <ReportCard icon={<MessageSquareQuote className="h-4 w-4" />} title="Deeper Interview Intelligence" full>
+      <ReportCard
+        icon={<MessageSquareQuote className="h-4 w-4" />}
+        title="Deeper Interview Intelligence"
+        subtitle="Review likely interview questions to understand what you may be asked. Click on any evidence gap to explore examples of strong and risky answers."
+        full
+      >
         <div className="space-y-3">
-          {seeker && (
-            <p className="text-xs text-muted-foreground">
-              Review likely interview questions, along with examples of strong and risky answers, to prepare for what you may be asked.
-            </p>
-          )}
           {(result.interview_questions || []).map((q, i) => (
             <details key={i} className="group rounded-lg border border-border/60 bg-card px-4 py-3 open:shadow-[var(--shadow-card)]">
               <summary className="flex cursor-pointer items-start justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
@@ -1335,14 +1335,17 @@ function SectionGrid({ children }: { children: React.ReactNode }) {
   return <section className="grid gap-6 md:grid-cols-2">{children}</section>;
 }
 
-function ReportCard({ icon, title, children, full }: {
-  icon: React.ReactNode; title: string; children: React.ReactNode; full?: boolean;
+function ReportCard({ icon, title, subtitle, children, full }: {
+  icon: React.ReactNode; title: string; subtitle?: string; children: React.ReactNode; full?: boolean;
 }) {
   return (
     <Card className={`overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)] ${full ? "md:col-span-2" : ""}`}>
-      <div className="flex items-center gap-2 border-b border-border/70 bg-muted/30 px-5 py-3 text-sm font-semibold">
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</span>
-        {title}
+      <div className="border-b border-border/70 bg-muted/30 px-5 py-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</span>
+          {title}
+        </div>
+        {subtitle && <p className="mt-1.5 text-xs font-normal text-muted-foreground">{subtitle}</p>}
       </div>
       <div className="p-5">{children}</div>
     </Card>
