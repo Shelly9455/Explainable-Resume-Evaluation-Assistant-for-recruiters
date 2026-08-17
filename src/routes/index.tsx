@@ -398,6 +398,7 @@ function Stepper({ current }: { current: Step }) {
 function Step1({ jd, setJd, loading, onNext }: {
   jd: string; setJd: (v: string) => void; loading: boolean; onNext: () => void;
 }) {
+  const seeker = useSeeker();
   const onFile = async (f: File | null) => {
     if (!f) return;
     const text = await extractFileText(f);
@@ -409,7 +410,9 @@ function Step1({ jd, setJd, loading, onNext }: {
         <Badge variant="secondary" className="mb-3 gap-1"><Shield className="h-3 w-3" /> Step 1 of 4</Badge>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Upload your job description</h1>
         <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-          We'll derive a transparent hiring rubric you can review and customize before any candidate is evaluated.
+          {seeker
+            ? "We'll derive transparent evaluation criteria from the job description."
+            : "We'll derive a transparent hiring rubric you can review and customize before any candidate is evaluated."}
         </p>
       </div>
 
