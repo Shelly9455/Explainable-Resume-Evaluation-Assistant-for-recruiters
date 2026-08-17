@@ -223,6 +223,32 @@ function toFriendlyGroqError(status: number, text: string) {
   return `AI provider error ${status}: ${text.slice(0, 240)}`;
 }
 
+function repairJson(input: string) {
+  let text = input.trim();
+  text = text.replace(/,\s*$/, "");
+  let inString = false;
+  let escaped = false;
+  const stack: string[] = [];
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{" || ch === "[") stack.push(ch);
+    else if (ch === "}" || ch === "]") stack.pop();
+  }
+  if (inString) text += '"';
+  text = text.replace(/,\s*$/, "");
+  while (stack.length) {
+    const open = stack.pop();
+    text += open === "{" ? "}" : "]";
+  }
+  return text;
+}
+
 async function callGroq(system: string, user: string, options: GroqCallOptions) {
   const aiKey = process.env.LOVABLE_API_KEY;
   if (!aiKey) throw new Error("AI gateway key is not configured.");
