@@ -249,6 +249,39 @@ function repairJson(input: string) {
   return text;
 }
 
+/**
+ * Parse possibly-truncated JSON. Tries a direct parse, then a structural
+ * repair, then progressively drops the trailing (incomplete) fragment at
+ * safe boundaries until a valid document is recovered.
+ */
+function parseLooseJson(candidate: string) {
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    /* fall through */
+  }
+  try {
+    return JSON.parse(repairJson(candidate));
+  } catch {
+    /* fall through */
+  }
+  let cut = candidate.length;
+  for (let attempts = 0; attempts < 400 && cut > 1; attempts += 1) {
+    let idx = -1;
+    for (const ch of [",", "}", "]", '"']) {
+      idx = Math.max(idx, candidate.lastIndexOf(ch, cut - 1));
+    }
+    if (idx <= 0) break;
+    cut = idx;
+    try {
+      return JSON.parse(repairJson(candidate.slice(0, cut)));
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("The AI response could not be parsed. Please try again.");
+}
+
 async function callGroq(system: string, user: string, options: GroqCallOptions) {
   const aiKey = process.env.LOVABLE_API_KEY;
   if (!aiKey) throw new Error("AI gateway key is not configured.");
@@ -283,11 +316,7 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
       const start = raw.indexOf("{");
       if (start === -1) throw new Error("Model did not return JSON.");
       const candidate = raw.slice(start);
-      try {
-        return JSON.parse(candidate);
-      } catch {
-        return JSON.parse(repairJson(candidate));
-      }
+      return parseLooseJson(candidate);
     }
 
     const text = await res.text();
