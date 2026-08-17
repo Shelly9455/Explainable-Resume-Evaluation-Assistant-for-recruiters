@@ -895,17 +895,22 @@ function Step3({
 
 /* ============================ SHARED ============================ */
 
-function SectionCard({ icon, title, children, action }: {
-  icon: React.ReactNode; title: string; children: React.ReactNode; action?: React.ReactNode;
+function SectionCard({ icon, title, children, action, subtitle }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode; action?: React.ReactNode; subtitle?: string;
 }) {
   return (
     <Card className="overflow-hidden border-border/70 p-0 shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-muted/30 px-5 py-3 text-sm font-semibold">
-        <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</span>
-          {title}
+      <div className="border-b border-border/70 bg-muted/30 px-5 py-3">
+        <div className="flex items-center justify-between gap-2 text-sm font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary">{icon}</span>
+            {title}
+          </div>
+          {action}
         </div>
-        {action}
+        {subtitle ? (
+          <p className="mt-2 text-xs font-normal text-muted-foreground">{subtitle}</p>
+        ) : null}
       </div>
       <div className="p-5">{children}</div>
     </Card>
