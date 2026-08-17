@@ -256,9 +256,14 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
         throw new Error("The AI response was cut off before the evaluation JSON could finish.");
       }
       const raw = choice?.message?.content ?? "";
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Model did not return JSON.");
-      return JSON.parse(jsonMatch[0]);
+      const start = raw.indexOf("{");
+      if (start === -1) throw new Error("Model did not return JSON.");
+      const candidate = raw.slice(start);
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        return JSON.parse(repairJson(candidate));
+      }
     }
 
     const text = await res.text();
