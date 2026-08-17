@@ -543,13 +543,11 @@ function Step2({
       </SectionCard>
 
       <SectionCard icon={<Target className="h-4 w-4" />} title="Suggested Guardrails"
+        subtitle="Review each suggestion and Approve or Reject it. You can also Edit, Add, or Remove guardrails. Approve minimum 3 guardrails to continue."
         action={<Button variant="outline" size="sm" onClick={addGuardrail} className="gap-2">
           <Plus className="h-3.5 w-3.5" /> Add guardrail
         </Button>}>
         <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Review the suggested guardrails, then edit, add, or remove any requirement before approving or rejecting each guardrail.
-          </p>
           {guardrails.map((g) => (
             <div key={g.id} className={`rounded-lg border bg-card p-3 ${
               g.status === "approved" ? "border-[oklch(0.62_0.16_155/0.45)]" :
