@@ -316,11 +316,7 @@ async function callGroq(system: string, user: string, options: GroqCallOptions) 
       const start = raw.indexOf("{");
       if (start === -1) throw new Error("Model did not return JSON.");
       const candidate = raw.slice(start);
-      try {
-        return JSON.parse(candidate);
-      } catch {
-        return JSON.parse(repairJson(candidate));
-      }
+      return parseLooseJson(candidate);
     }
 
     const text = await res.text();
