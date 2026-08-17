@@ -384,7 +384,40 @@ export const analyzeJD = createServerFn({ method: "POST" })
       `JOB DESCRIPTION:\n${truncateText(data.jd, 9000)}\n\nReturn the JSON object now.`,
       { maxTokens: 6000, maxUserChars: 10000, retries: 1, temperature: 0, seed: 42 },
     );
-    const analysis = out as JDAnalysis;
+    const partial = (out ?? {}) as Partial<JDAnalysis>;
+    const weightKeys = [
+      "skills_match",
+      "experience_match",
+      "domain_relevance",
+      "critical_requirements",
+      "risk_factors",
+    ] as const;
+    const rawWeights = Array.isArray(partial.recommended_weightages)
+      ? partial.recommended_weightages
+      : [];
+    const analysis: JDAnalysis = {
+      ...(partial as JDAnalysis),
+      role_summary: partial.role_summary ?? "",
+      critical_requirements: Array.isArray(partial.critical_requirements)
+        ? partial.critical_requirements
+        : [],
+      suggested_guardrails: Array.isArray(partial.suggested_guardrails)
+        ? partial.suggested_guardrails.filter(Boolean).map((g, i) => ({
+            ...g,
+            id: g?.id || `g${i + 1}`,
+          }))
+        : [],
+      recommended_weightages: weightKeys.map((key, i) => {
+        const found = rawWeights.find((w) => w?.key === key);
+        return {
+          key,
+          guardrail_requirement:
+            found?.guardrail_requirement || key.replace(/_/g, " "),
+          weight: typeof found?.weight === "number" ? found.weight : 20,
+          rationale: found?.rationale || "",
+        } as JDAnalysis["recommended_weightages"][number];
+      }),
+    };
     analyzeCache.set(cacheKey, analysis);
     return analysis;
   });
