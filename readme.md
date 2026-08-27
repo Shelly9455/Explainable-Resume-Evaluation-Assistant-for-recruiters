@@ -33,4 +33,4 @@ An AI-powered Explainable Resume Evaluation Assistant that:
 JD Analysis → Rubric Finalization → Resume Evaluation
 
 ## Lovable Prototype
-https://lovable.dev/projects/1d36ec25-42ae-485c-90aa-9eb05854a7d2
+https://rubric-buddy-18.lovable.app
